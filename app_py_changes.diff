@@ -1,17 +1,114 @@
---- /tmp/orig.py	2026-08-06 06:30:52.106984887 +0000
-+++ /tmp/new.py	2026-08-06 06:30:52.110984888 +0000
-@@ -2055,6 +2055,56 @@
+--- /tmp/real_orig.py	2026-08-06 07:38:46.533738503 +0000
++++ /tmp/real_fixed.py	2026-08-06 07:38:46.537738503 +0000
+@@ -117,7 +117,7 @@
+         color: #ffffff !important;
+         box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25) !important;
+     }
+-    /* APPLE SAFARI TAB STYLE FOR NAVIGATION RADIO TABS (Scope to .safari-nav-wrapper) */
++    /* [수정] CHROME BROWSER TAB STYLE FOR NAVIGATION RADIO TABS (Scope to .safari-nav-wrapper) */
+     .safari-nav-wrapper div[data-testid="stRadio"],
+     .safari-nav-wrapper div[data-testid="stRadio"] > div,
+     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] {
+@@ -128,40 +128,41 @@
+         box-sizing: border-box !important;
+     }
+     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] {
+-        background: #e5e7eb !important;
+-        border: 1.5px solid #cbd5e1 !important;
+-        border-top: none !important;
+-        padding: 5px !important;
+-        border-radius: 0 0 16px 16px !important;
+-        gap: 4px !important;
+-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06) !important;
++        background: #dee1e6 !important;
++        border: none !important;
++        padding: 8px 10px 0 10px !important;
++        border-radius: 0 0 10px 10px !important;
++        gap: 8px !important;
++        box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.04) !important;
+     }
+     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label {
+-        background: transparent !important;
++        background: #c7cbd1 !important;
+         border: none !important;
+-        border-radius: 9px !important;
+-        padding: 10px 4px !important;
++        border-radius: 10px 10px 0 0 !important;
++        padding: 14px 20px !important;
+         margin: 0 !important;
+-        color: #475569 !important;
+-        font-size: 13px !important;
++        color: #3c4043 !important;
++        font-size: 14px !important;
+         font-weight: 600 !important;
+-        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
++        transition: all 0.18s ease !important;
+         cursor: pointer !important;
+         flex: 1 1 20% !important;
+         width: 20% !important;
+-        min-width: 20% !important;
++        min-width: 0 !important;
+         max-width: 20% !important;
+         justify-content: center !important;
+         text-align: center !important;
+         box-sizing: border-box !important;
++        position: relative !important;
++        top: 1px !important;
+     }
+     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label div[data-testid="stMarkdownContainer"] p {
+         white-space: nowrap !important;
+         overflow: hidden !important;
+         text-overflow: ellipsis !important;
+-        font-size: 13px !important;
++        font-size: 14px !important;
+         margin: 0 !important;
+-        line-height: 1.2 !important;
++        line-height: 1.3 !important;
+         text-align: center !important;
+     }
+     /* Hide Radio Circles Completely inside Safari Nav Wrapper */
+@@ -169,15 +170,16 @@
+         display: none !important;
+     }
+     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
+-        background: rgba(255, 255, 255, 0.65) !important;
++        background: #eef0f2 !important;
+         color: #0f172a !important;
+     }
+     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-checked="true"],
+     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) {
+         background: #ffffff !important;
+-        color: #0f172a !important;
++        color: #059669 !important;
+         font-weight: 800 !important;
+-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08) !important;
++        box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.06) !important;
++        border-bottom: 3px solid #059669 !important;
+     }
+     /* FIXED EXACT EQUAL HEIGHT FOR ALL 4 METRIC CARDS */
+     .metric-card {
+@@ -1642,7 +1644,7 @@
+ 
+     # --- 3. Anthropic Claude API ---
+     elif engine_choice == "claude":
+-        target_model = model_version if model_version else "claude-3-5-sonnet-20241022"
++        target_model = model_version if model_version else "claude-sonnet-5"
+         api_key = user_api_key.strip() or os.environ.get("ANTHROPIC_API_KEY", "").strip()
+         if not api_key:
+             return generate_extraction_method_proposals(query_resource, extract_part), "Anthropic Claude API Key가 입력되지 않았습니다. (식물 문헌 DB 엔진으로 전환)"
+@@ -2055,6 +2057,59 @@
          """
      return svg
  
 +
 +# =============================================================================
 +# [RECONSTRUCTED SCAFFOLD] main() header + control panel + col1
-+# The uploaded file was truncated here: `def main():`, the page header, the
-+# control-panel container, the st.columns() unpacking and the `with col1:`
-+# block were missing, leaving `with col2:` orphaned (IndentationError) and
-+# main() undefined at line 3135. Only this scaffold is added; every original
-+# line below is untouched.
++# The uploaded/exported app.py is truncated here: `def main():`, the page
++# header, the st.columns() unpacking and the `with col1:` block were missing,
++# leaving `with col2:` orphaned (IndentationError) and main() undefined at the
++# bottom of the file. Only this scaffold is added; every original line below
++# is untouched. (No stray unclosed "control-panel-box" div this time - that
++# was rendering as an empty gray box in the previous reconstruction.)
 +# =============================================================================
 +def main():
 +    st.markdown("""
@@ -24,18 +121,20 @@
 +    """, unsafe_allow_html=True)
 +
 +    with st.container():
-+        st.markdown('<div class="control-panel-box">', unsafe_allow_html=True)
-+
 +        col1, col2, col3, col4 = st.columns([1.5, 1.0, 1.0, 1.3])
 +
 +        with col1:
 +            plant_presets = [
 +                "Ginkgo biloba (은행나무)",
 +                "Panax ginseng (인삼)",
-+                "Sambucus nigra (엘더베리)",
 +                "Curcuma longa (강황/울금)",
-+                "Justicia procumbens (쥐꼬리망초)",
 +                "Camellia sinensis (녹차)",
++                "Allium sativum (마늘)",
++                "Zingiber officinale (생강)",
++                "Glycyrrhiza glabra (감초)",
++                "Artemisia annua (개낙)",
++                "Scutellaria baicalensis (황금)",
++                "Justicia procumbens (쥐꼬리망초)",
 +                "Direct Input (직접 입력)"
 +            ]
 +            selected_plant_preset = st.selectbox(
@@ -48,7 +147,7 @@
 +                query_input = st.text_input(
 +                    "학명 직접 입력 (Binomial Name):",
 +                    value="",
-+                    placeholder="e.g. Glycyrrhiza uralensis",
++                    placeholder="e.g. Sambucus nigra",
 +                    key="top_plant_custom_input"
 +                ).strip()
 +            else:
@@ -57,18 +156,17 @@
          with col2:
              extract_parts = [
                  "Leaves (잎)",
-@@ -2166,26 +2216,26 @@
+@@ -2166,26 +2221,25 @@
  
          bar.progress(90, text="[Stage 4/4] Inferring Causal MOA & Multitarget Antiviral Pathways...")
  
 +        # [수정] localhost:8009 FastAPI 백엔드 호출 -> 인프로세스 엔진 직접 호출로 교체.
-+        # 원본 코드는 별도 FastAPI 서버가 떠 있어야만 동작했는데, 해당 백엔드 소스가
-+        # 제공되지 않아 항상 연결 실패로 끝났음. get_engine()이 반환하는
-+        # LitPhytoPanRNAEngine.run()을 바로 호출하도록 바꿔서 별도 서버 없이도
-+        # (로컬이든 Streamlit Cloud든) 안정적으로 실행되게 함.
-+        # ⚠️ [근거 없음] 현재 엔진(pipeline/orchestrator.py 등)은 결정론적 휴리스틱
-+        # placeholder이며, 실제 3D GNN 도킹/세포실험 결과가 아님. 자세한 내용은
-+        # 각 모듈 docstring 및 README 참고.
++        # 원본은 별도 FastAPI 서버(api/main.py, 기본 포트 8000이지만 여기선 8009로
++        # 하드코딩됨)가 떠 있어야만 동작하는 구조였음. 별도 서버 프로세스 관리 없이
++        # (로컬이든 Streamlit Cloud든) 안정적으로 동작하도록 get_engine()이 반환하는
++        # 실제 LitPhytoPanRNAEngine의 run_pipeline() 메서드를 바로 호출함.
++        # (주의: 이 엔진 클래스의 실제 메서드명은 run_pipeline()이지 run()이 아님 -
++        #  pipeline/orchestrator.py 참고.)
          try:
 -            import requests
 -            resp = requests.post(
@@ -81,7 +179,7 @@
 -                },
 -                timeout=30
 +            engine = get_engine()
-+            st.session_state["pipeline_result"] = engine.run(
++            st.session_state["pipeline_result"] = engine.run_pipeline(
 +                query_resource=query_input,
 +                target_virus=target_virus,
 +                extract_part=extract_part,
@@ -101,15 +199,66 @@
          finally:
              progress_placeholder.empty()
              status_placeholder.empty()
-@@ -2197,6 +2247,11 @@
+@@ -2197,6 +2251,12 @@
      if not result:
          return
  
 +    st.caption(
-+        "⚠️ 본 결과는 로컬 휴리스틱 파이프라인(결정론적 placeholder 알고리즘) 산출값이며, "
-+        "실제 3D GNN 도킹/세포실험으로 검증된 수치가 아닙니다. [근거 없음]"
++        "⚠️ 화합물명과 문헌 인용(PMID/DOI)은 실제 식물화학 문헌 기반 DB에서 가져온 값이지만, "
++        "결합 에너지(kcal/mol)·시너지 점수 등 수치는 실제 GNN 모델 추론이 아닌 결정론적 "
++        "추정 공식으로 산출됩니다. 임상적으로 검증된 수치가 아닙니다. [근거 없음]"
 +    )
 +
      # Extract Data & Metrics
      summary = result.get("virtual_profile_summary", {})
      leads = result.get("predicted_leads", [])
+@@ -2320,30 +2380,19 @@
+ 
+     st.markdown("<br>", unsafe_allow_html=True)
+ 
+-    # --- Display Navigation Tabs (macOS Safari Browser Style Header & 100% Full Width Tabs) ---
++    # [수정] macOS Safari 트래픽라이트 스타일 -> 크롬 브라우저 창 바 스타일로 교체.
+     st.markdown("""
+-    <div style="background: linear-gradient(180deg, #f3f4f6 0%, #e5e7eb 100%); border: 1.5px solid #cbd5e1; border-radius: 16px 16px 0 0; padding: 10px 20px 8px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 12px rgba(0,0,0,0.04); margin-bottom:-2px;">
+-        <div style="display:flex; align-items:center; gap:14px;">
+-            <div style="display:flex; align-items:center; gap:8px;">
+-                <span style="width:12px; height:12px; border-radius:50%; background:#ff5f56; display:inline-block; border:0.5px solid #e0443e;"></span>
+-                <span style="width:12px; height:12px; border-radius:50%; background:#ffbd2e; display:inline-block; border:0.5px solid #dea123;"></span>
+-                <!-- 3rd Green Dot: Highlighted Active Page Indicator -->
+-                <span style="width:13px; height:13px; border-radius:50%; background:#10b981; display:inline-flex; align-items:center; justify-content:center; border:1px solid #059669; box-shadow:0 0 8px rgba(16, 185, 129, 0.8); color:#ffffff; font-size:9px; font-weight:900;">✓</span>
+-            </div>
+-            <div style="height:14px; width:1px; background:#cbd5e1; margin:0 4px;"></div>
+-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+-                <rect x="3" y="3" width="18" height="18" rx="4" ry="4"></rect>
+-                <line x1="9" y1="3" x2="9" y2="21"></line>
++    <div style="background: #dee1e6; border-radius: 10px 10px 0 0; padding: 10px 18px 0 18px; display: flex; align-items: center; justify-content: space-between;">
++        <div style="display:flex; align-items:center; gap:10px;">
++            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
++                <circle cx="12" cy="12" r="9"></circle>
++                <path d="M12 3a9 9 0 0 1 0 18 9 9 0 0 1 0-18z"></path>
+             </svg>
+-            <div style="display:flex; align-items:center; gap:8px; color:#94a3b8; font-size:14px; font-weight:800; margin-left:4px;">
+-                <span style="color:#64748b;">&lt;</span>
+-                <span style="color:#cbd5e1;">&gt;</span>
+-            </div>
++            <span style="font-size:12.5px; font-weight:700; color:#5f6368;">LitPhyto-PanInfluenza Engine — Results</span>
+         </div>
+-        <!-- Right: Active Page Indicator (3rd Green Dot Highlighted) -->
+-        <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#047857; background:#ecfdf5; border:1px solid #a7f3d0; padding:3px 12px; border-radius:12px;">
+-            <span style="width:8px; height:8px; border-radius:50%; background:#10b981; display:inline-block;"></span>
+-            <span>보고 있는 활성 페이지 (3번째 🟢 초록 동그라미 표기)</span>
++        <div style="display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:800; color:#047857; background:#e6f4ea; border:1px solid #a7f3d0; padding:3px 12px; border-radius:12px;">
++            <span style="width:7px; height:7px; border-radius:50%; background:#1a73e8; display:inline-block;"></span>
++            <span>분석 결과 페이지</span>
+         </div>
+     </div>
+     """, unsafe_allow_html=True)
+@@ -2667,7 +2716,7 @@
+                 """, unsafe_allow_html=True)
+                 selected_model_version = st.selectbox(
+                     "Claude 모델 버전 선택:",
+-                    options=["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
++                    options=["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5-20251001"],
+                     index=0,
+                     key="claude_version_select"
+                 )

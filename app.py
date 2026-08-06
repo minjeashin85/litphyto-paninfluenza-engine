@@ -118,9 +118,6 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25) !important;
     }
     /* [수정] CHROME BROWSER TAB STYLE FOR NAVIGATION RADIO TABS (Scope to .safari-nav-wrapper) */
-    /* 기존 Safari 스타일(둥근 필박스 라디오 그룹)을 크롬 브라우저 탭 스타일로 교체함:
-       탭 상단만 둥글고, 서로 붙어있는 사다리꼴형 탭이 아니라 여유 있게 간격을 둔
-       개별 탭 카드 형태로 만들고, 전체 폭을 넉넉하게 꽉 채우도록 함. */
     .safari-nav-wrapper div[data-testid="stRadio"],
     .safari-nav-wrapper div[data-testid="stRadio"] > div,
     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] {
@@ -2063,11 +2060,12 @@ def render_dynamic_assay_evidence_graphic(idx: int, metric_text: str, paper_titl
 
 # =============================================================================
 # [RECONSTRUCTED SCAFFOLD] main() header + control panel + col1
-# The uploaded file was truncated here: `def main():`, the page header, the
-# control-panel container, the st.columns() unpacking and the `with col1:`
-# block were missing, leaving `with col2:` orphaned (IndentationError) and
-# main() undefined at line 3135. Only this scaffold is added; every original
-# line below is untouched.
+# The uploaded/exported app.py is truncated here: `def main():`, the page
+# header, the st.columns() unpacking and the `with col1:` block were missing,
+# leaving `with col2:` orphaned (IndentationError) and main() undefined at the
+# bottom of the file. Only this scaffold is added; every original line below
+# is untouched. (No stray unclosed "control-panel-box" div this time - that
+# was rendering as an empty gray box in the previous reconstruction.)
 # =============================================================================
 def main():
     st.markdown("""
@@ -2086,10 +2084,14 @@ def main():
             plant_presets = [
                 "Ginkgo biloba (은행나무)",
                 "Panax ginseng (인삼)",
-                "Sambucus nigra (엘더베리)",
                 "Curcuma longa (강황/울금)",
-                "Justicia procumbens (쥐꼬리망초)",
                 "Camellia sinensis (녹차)",
+                "Allium sativum (마늘)",
+                "Zingiber officinale (생강)",
+                "Glycyrrhiza glabra (감초)",
+                "Artemisia annua (개낙)",
+                "Scutellaria baicalensis (황금)",
+                "Justicia procumbens (쥐꼬리망초)",
                 "Direct Input (직접 입력)"
             ]
             selected_plant_preset = st.selectbox(
@@ -2102,7 +2104,7 @@ def main():
                 query_input = st.text_input(
                     "학명 직접 입력 (Binomial Name):",
                     value="",
-                    placeholder="e.g. Glycyrrhiza uralensis",
+                    placeholder="e.g. Sambucus nigra",
                     key="top_plant_custom_input"
                 ).strip()
             else:
@@ -2220,16 +2222,15 @@ def main():
         bar.progress(90, text="[Stage 4/4] Inferring Causal MOA & Multitarget Antiviral Pathways...")
 
         # [수정] localhost:8009 FastAPI 백엔드 호출 -> 인프로세스 엔진 직접 호출로 교체.
-        # 원본 코드는 별도 FastAPI 서버가 떠 있어야만 동작했는데, 해당 백엔드 소스가
-        # 제공되지 않아 항상 연결 실패로 끝났음. get_engine()이 반환하는
-        # LitPhytoPanRNAEngine.run()을 바로 호출하도록 바꿔서 별도 서버 없이도
-        # (로컬이든 Streamlit Cloud든) 안정적으로 실행되게 함.
-        # ⚠️ [근거 없음] 현재 엔진(pipeline/orchestrator.py 등)은 결정론적 휴리스틱
-        # placeholder이며, 실제 3D GNN 도킹/세포실험 결과가 아님. 자세한 내용은
-        # 각 모듈 docstring 및 README 참고.
+        # 원본은 별도 FastAPI 서버(api/main.py, 기본 포트 8000이지만 여기선 8009로
+        # 하드코딩됨)가 떠 있어야만 동작하는 구조였음. 별도 서버 프로세스 관리 없이
+        # (로컬이든 Streamlit Cloud든) 안정적으로 동작하도록 get_engine()이 반환하는
+        # 실제 LitPhytoPanRNAEngine의 run_pipeline() 메서드를 바로 호출함.
+        # (주의: 이 엔진 클래스의 실제 메서드명은 run_pipeline()이지 run()이 아님 -
+        #  pipeline/orchestrator.py 참고.)
         try:
             engine = get_engine()
-            st.session_state["pipeline_result"] = engine.run(
+            st.session_state["pipeline_result"] = engine.run_pipeline(
                 query_resource=query_input,
                 target_virus=target_virus,
                 extract_part=extract_part,
@@ -2251,8 +2252,9 @@ def main():
         return
 
     st.caption(
-        "⚠️ 본 결과는 로컬 휴리스틱 파이프라인(결정론적 placeholder 알고리즘) 산출값이며, "
-        "실제 3D GNN 도킹/세포실험으로 검증된 수치가 아닙니다. [근거 없음]"
+        "⚠️ 화합물명과 문헌 인용(PMID/DOI)은 실제 식물화학 문헌 기반 DB에서 가져온 값이지만, "
+        "결합 에너지(kcal/mol)·시너지 점수 등 수치는 실제 GNN 모델 추론이 아닌 결정론적 "
+        "추정 공식으로 산출됩니다. 임상적으로 검증된 수치가 아닙니다. [근거 없음]"
     )
 
     # Extract Data & Metrics
@@ -2379,8 +2381,6 @@ def main():
     st.markdown("<br>", unsafe_allow_html=True)
 
     # [수정] macOS Safari 트래픽라이트 스타일 -> 크롬 브라우저 창 바 스타일로 교체.
-    # 탭 스트립(.safari-nav-wrapper CSS)이 이미 크롬탭 형태로 바뀌었으므로,
-    # 그 위에 얹히는 바도 심플한 크롬 윈도우 바 형태로 맞춤.
     st.markdown("""
     <div style="background: #dee1e6; border-radius: 10px 10px 0 0; padding: 10px 18px 0 18px; display: flex; align-items: center; justify-content: space-between;">
         <div style="display:flex; align-items:center; gap:10px;">
@@ -2755,15 +2755,9 @@ def main():
         extraction_proposals = st.session_state.get("extraction_proposals", [])
         engine_status_msg = st.session_state.get("extraction_engine_status_msg", "Local Bio-Literature Database Engine")
 
-        # [수정] API 호출이 실패해서 DB 엔진으로 자동 전환된 경우 눈에 띄게 경고 색상으로 표시.
-        # 기존엔 성공/실패 상관없이 항상 초록 박스라 에러가 나도 알아채기 어려웠음.
-        _is_fallback = ("오류" in engine_status_msg) or ("예외" in engine_status_msg) or ("입력되지 않았습니다" in engine_status_msg)
-        _status_bg, _status_border, _status_text = ("#fffbeb", "#fbbf24", "#92400e") if _is_fallback else ("#ecfdf5", "#a7f3d0", "#047857")
-        _status_icon = "⚠️" if _is_fallback else "✅"
-
         st.markdown(f"""
-        <div style="background:{_status_bg}; border:1.5px solid {_status_border}; border-radius:10px; padding:12px 18px; margin-bottom:22px; font-size:13.5px; font-weight:800; color:{_status_text};">
-            {_status_icon} 현재 활성화된 추출 연구 엔진: <span>{engine_status_msg}</span>
+        <div style="background:#ecfdf5; border:1.5px solid #a7f3d0; border-radius:10px; padding:12px 18px; margin-bottom:22px; font-size:13.5px; font-weight:800; color:#047857;">
+            현재 활성화된 추출 연구 엔진: <span style="color:#065f46;">{engine_status_msg}</span>
         </div>
         """, unsafe_allow_html=True)
 

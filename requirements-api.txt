@@ -1,0 +1,13 @@
+# api/main.py를 별도 FastAPI 서버로 로컬 실행할 때만 필요함
+# (uvicorn api.main:app --reload --port 8000)
+# app.py는 이 서버를 쓰지 않고 엔진을 in-process로 직접 호출하므로
+# Streamlit 배포에는 이 파일이 필요 없음.
+fastapi>=0.100.0
+pydantic>=2.0
+uvicorn>=0.20.0
+streamlit>=1.25.0
+pandas>=2.0.0
+requests>=2.28.0
+networkx>=3.0
+rdkit>=2022.09.1
+pubchempy>=1.0.4

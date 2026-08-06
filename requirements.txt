@@ -1,4 +1,21 @@
-streamlit>=1.40
-pandas
-requests
-openpyxl
+# Streamlit 앱 배포용 최소 구성 (app.py가 in-process로 엔진을 직접 호출하므로
+# fastapi/uvicorn/pydantic은 배포에 필수 아님 - api/main.py를 별도 REST 서버로
+# 로컬 실행할 때만 필요함. 그쪽은 requirements-api.txt로 분리함.)
+streamlit>=1.25.0
+pandas>=2.0.0
+requests>=2.28.0
+openpyxl>=3.1.0
+networkx>=3.0
+rdkit>=2022.09.1
+pubchempy>=1.0.4
+
+# [의도적으로 제외] torch, torch-geometric
+# models/gnn_predictor.py에 PyTorch GIN 모델 클래스가 정의는 돼 있지만
+# predict_leads_and_affinities()의 실제 결합에너지 계산은 model.forward()를
+# 전혀 호출하지 않고 결정론적 해시 공식만 씀 (코드 확인 완료). 즉 torch가
+# 있어도 없어도 예측값 자체는 동일함. torch+torch-geometric은 용량이 크고
+# Streamlit Community Cloud 무료 티어에서 빌드 실패/타임아웃 위험이 높은 반면
+# 현재 실질적으로 아무 계산도 안 하므로 배포 requirements에서는 제외함.
+# pipeline/extract_twin.py도 torch 미설치 시 PyG 그래프 생성만 조용히 건너뛰고
+# (HAS_TORCH 가드 처리됨) 나머지 기능(화학 분류, 3D conformer 등)은 정상 동작함.
+# 나중에 실제 학습된 가중치로 GNN을 진짜 쓰게 되면 그때 다시 추가하면 됨.
