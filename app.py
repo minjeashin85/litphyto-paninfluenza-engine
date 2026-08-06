@@ -2077,15 +2077,15 @@ def main():
     st.markdown(f"""
     <div class="main-header-box" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
         <h1 class="main-title" style="margin:0;">🔮 LitPhyto-PanInfluenza Engine</h1>
-        <div style="display:flex; align-items:center; gap:14px;">
-            <a href="https://www.hallym.ac.kr/hallym/index.do" target="_blank" title="한림대학교">
-                <img src="data:image/png;base64,{_hallym_b64}" style="height:46px; width:auto; border-radius:6px;" />
+        <div style="display:flex; align-items:center; gap:20px;">
+            <a href="https://www.hallym.ac.kr/hallym/index.do" target="_blank" title="한림대학교" style="display:flex; align-items:center; justify-content:center; width:88px; height:88px;">
+                <img src="data:image/png;base64,{_hallym_b64}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain;" />
             </a>
-            <a href="https://www.nibr.go.kr" target="_blank" title="국립생물자원관">
-                <img src="data:image/jpeg;base64,{_nibr_b64}" style="height:46px; width:auto; border-radius:6px;" />
+            <a href="https://www.nibr.go.kr" target="_blank" title="국립생물자원관" style="display:flex; align-items:center; justify-content:center; width:88px; height:88px;">
+                <img src="data:image/jpeg;base64,{_nibr_b64}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain;" />
             </a>
-            <a href="https://sites.google.com/glab.hallym.ac.kr/milab/home" target="_blank" title="Molecular Immunology Laboratory">
-                <img src="data:image/png;base64,{_milab_b64}" style="height:46px; width:auto; border-radius:6px;" />
+            <a href="https://sites.google.com/glab.hallym.ac.kr/milab/home" target="_blank" title="Molecular Immunology Laboratory" style="display:flex; align-items:center; justify-content:center; width:88px; height:88px;">
+                <img src="data:image/png;base64,{_milab_b64}" style="max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain;" />
             </a>
         </div>
     </div>
