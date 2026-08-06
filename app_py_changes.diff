@@ -1,0 +1,115 @@
+--- /tmp/orig.py	2026-08-06 06:30:52.106984887 +0000
++++ /tmp/new.py	2026-08-06 06:30:52.110984888 +0000
+@@ -2055,6 +2055,56 @@
+         """
+     return svg
+ 
++
++# =============================================================================
++# [RECONSTRUCTED SCAFFOLD] main() header + control panel + col1
++# The uploaded file was truncated here: `def main():`, the page header, the
++# control-panel container, the st.columns() unpacking and the `with col1:`
++# block were missing, leaving `with col2:` orphaned (IndentationError) and
++# main() undefined at line 3135. Only this scaffold is added; every original
++# line below is untouched.
++# =============================================================================
++def main():
++    st.markdown("""
++    <div class="main-header-box">
++        <h1 class="main-title">🔮 LitPhyto-PanInfluenza Engine</h1>
++    </div>
++    <div class="sub-title">
++        AI-Driven Plant Species Binomial Profile Twin &amp; Antiviral MOA Predictor
++    </div>
++    """, unsafe_allow_html=True)
++
++    with st.container():
++        st.markdown('<div class="control-panel-box">', unsafe_allow_html=True)
++
++        col1, col2, col3, col4 = st.columns([1.5, 1.0, 1.0, 1.3])
++
++        with col1:
++            plant_presets = [
++                "Ginkgo biloba (은행나무)",
++                "Panax ginseng (인삼)",
++                "Sambucus nigra (엘더베리)",
++                "Curcuma longa (강황/울금)",
++                "Justicia procumbens (쥐꼬리망초)",
++                "Camellia sinensis (녹차)",
++                "Direct Input (직접 입력)"
++            ]
++            selected_plant_preset = st.selectbox(
++                "Plant Species Binomial Name (식물 학명):",
++                plant_presets,
++                index=0,
++                key="top_plant_preset_select"
++            )
++            if "Direct Input" in selected_plant_preset:
++                query_input = st.text_input(
++                    "학명 직접 입력 (Binomial Name):",
++                    value="",
++                    placeholder="e.g. Glycyrrhiza uralensis",
++                    key="top_plant_custom_input"
++                ).strip()
++            else:
++                query_input = selected_plant_preset.split("(")[0].strip()
++
+         with col2:
+             extract_parts = [
+                 "Leaves (잎)",
+@@ -2166,26 +2216,26 @@
+ 
+         bar.progress(90, text="[Stage 4/4] Inferring Causal MOA & Multitarget Antiviral Pathways...")
+ 
++        # [수정] localhost:8009 FastAPI 백엔드 호출 -> 인프로세스 엔진 직접 호출로 교체.
++        # 원본 코드는 별도 FastAPI 서버가 떠 있어야만 동작했는데, 해당 백엔드 소스가
++        # 제공되지 않아 항상 연결 실패로 끝났음. get_engine()이 반환하는
++        # LitPhytoPanRNAEngine.run()을 바로 호출하도록 바꿔서 별도 서버 없이도
++        # (로컬이든 Streamlit Cloud든) 안정적으로 실행되게 함.
++        # ⚠️ [근거 없음] 현재 엔진(pipeline/orchestrator.py 등)은 결정론적 휴리스틱
++        # placeholder이며, 실제 3D GNN 도킹/세포실험 결과가 아님. 자세한 내용은
++        # 각 모듈 docstring 및 README 참고.
+         try:
+-            import requests
+-            resp = requests.post(
+-                "http://localhost:8009/api/v1/predict-extract",
+-                json={
+-                    "query_resource": query_input,
+-                    "target_virus": target_virus,
+-                    "extract_part": extract_part,
+-                    "gemini_api_key": api_key_to_pass
+-                },
+-                timeout=30
++            engine = get_engine()
++            st.session_state["pipeline_result"] = engine.run(
++                query_resource=query_input,
++                target_virus=target_virus,
++                extract_part=extract_part,
++                gemini_api_key=api_key_to_pass
+             )
+-            if resp.status_code == 200:
+-                st.session_state["pipeline_result"] = resp.json()
+-                bar.progress(100, text="✅ Analysis Complete!")
+-                time.sleep(0.4)
+-            else:
+-                st.error(f"FastAPI Backend 오류 (HTTP {resp.status_code}): {resp.text}")
++            bar.progress(100, text="✅ Analysis Complete!")
++            time.sleep(0.4)
+         except Exception as e:
+-            st.error(f"FastAPI Backend 연결 실패: {e}\n\n**http://localhost:8009** 서버가 실행 중인지 확인해주세요.")
++            st.error(f"파이프라인 실행 오류: {e}")
+         finally:
+             progress_placeholder.empty()
+             status_placeholder.empty()
+@@ -2197,6 +2247,11 @@
+     if not result:
+         return
+ 
++    st.caption(
++        "⚠️ 본 결과는 로컬 휴리스틱 파이프라인(결정론적 placeholder 알고리즘) 산출값이며, "
++        "실제 3D GNN 도킹/세포실험으로 검증된 수치가 아닙니다. [근거 없음]"
++    )
++
+     # Extract Data & Metrics
+     summary = result.get("virtual_profile_summary", {})
+     leads = result.get("predicted_leads", [])

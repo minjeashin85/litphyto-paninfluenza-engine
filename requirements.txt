@@ -1,0 +1,7 @@
+streamlit>=1.40
+pandas
+requests
+openpyxl
+
+# 선택 사항 (없어도 앱 안 죽음 - try/except로 감싸져 있음, fallback으로 PubChem 이미지 URL 사용됨)
+# rdkit-pypi
