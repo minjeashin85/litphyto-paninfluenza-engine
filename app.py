@@ -117,44 +117,53 @@ st.markdown("""
         color: #ffffff !important;
         box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25) !important;
     }
-    /* [수정] st.tabs() 네이티브 컴포넌트를 크롬탭처럼 스타일링.
-       BaseWeb의 data-baseweb 속성을 타겟팅함 - Streamlit 내부 data-testid보다
-       훨씬 안정적으로 버전 간 유지되는 식별자임. */
-    div[data-baseweb="tab-list"] {
-        width: 100% !important;
-        gap: 8px !important;
-        background: #dee1e6 !important;
-        padding: 8px 10px 0 10px !important;
-        border-radius: 10px 10px 0 0 !important;
-        box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.04) !important;
-    }
-    button[data-baseweb="tab"] {
+    /* [재수정 - 실제 DOM 검증 완료] 이전 두 번의 시도(data-testid=stRadio 기반,
+       data-baseweb=tab 기반)가 전부 실패한 이유를 실제 배포 버전의 DOM을
+       playwright로 직접 까봐서 확인함: 이 Streamlit 버전은 탭을 <button>이
+       아니라 <div data-testid="stTab" role="tab">로 렌더링함 (BaseWeb이 아닌
+       React Aria 기반 구현으로 바뀜 - data-baseweb 속성 자체가 없음).
+       태그명 제약 없이 속성 선택자만 쓰고, Streamlit 자체 testid를 1순위로 둠. */
+    [data-testid="stTab"], [role="tab"] {
         flex: 1 1 0 !important;
-        background: #c7cbd1 !important;
-        border-radius: 10px 10px 0 0 !important;
-        padding: 14px 20px !important;
-        font-size: 14px !important;
-        font-weight: 600 !important;
-        color: #3c4043 !important;
-        justify-content: center !important;
-        transition: all 0.18s ease !important;
-    }
-    button[data-baseweb="tab"]:hover {
-        background: #eef0f2 !important;
-        color: #0f172a !important;
-    }
-    button[data-baseweb="tab"][aria-selected="true"] {
         background: #ffffff !important;
-        color: #059669 !important;
+        border-radius: 10px !important;
+        border: 1.5px solid #e2e8f0 !important;
+        padding: 14px 10px !important;
+        justify-content: center !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+    }
+    [data-testid="stTab"] p, [role="tab"] p {
+        font-size: 15px !important;
+        font-weight: 700 !important;
+        color: #475569 !important;
+        white-space: nowrap !important;
+    }
+    [data-testid="stTab"]:hover, [role="tab"]:hover {
+        background: #f0fdf4 !important;
+        border-color: #6ee7b7 !important;
+    }
+    [data-testid="stTab"]:hover p, [role="tab"]:hover p {
+        color: #047857 !important;
+    }
+    [data-testid="stTab"][aria-selected="true"], [role="tab"][aria-selected="true"] {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+        border-color: #059669 !important;
+        box-shadow: 0 4px 16px rgba(5,150,105,0.35) !important;
+    }
+    [data-testid="stTab"][aria-selected="true"] p, [role="tab"][aria-selected="true"] p {
+        color: #ffffff !important;
         font-weight: 800 !important;
-        box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.06) !important;
     }
-    div[data-baseweb="tab-highlight"] {
-        background-color: #059669 !important;
-        height: 3px !important;
-    }
-    div[data-baseweb="tab-border"] {
-        display: none !important;
+    [role="tablist"] {
+        width: 100% !important;
+        display: flex !important;
+        gap: 6px !important;
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%) !important;
+        padding: 10px 10px !important;
+        border-radius: 14px !important;
+        border: 1.5px solid #cbd5e1 !important;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
     }
     /* FIXED EXACT EQUAL HEIGHT FOR ALL 4 METRIC CARDS */
     .metric-card {
@@ -2435,11 +2444,11 @@ def main():
     """, unsafe_allow_html=True)
 
     raw_tab_names = [
-        "Lead Candidates Profiles",
-        "MOA Pathway Diagram",
-        "Optimal Extraction Proposals",
-        "Patent Search",
-        "Excel / PDF Report Download"
+        "🧬 Lead Candidates Profiles",
+        "🔬 MOA Pathway Diagram",
+        "🌿 Optimal Extraction Proposals",
+        "📜 Patent Search",
+        "📊 Excel / PDF Report Download"
     ]
 
     # [수정] st.radio + CSS 해킹으로 만든 가짜 탭 -> 네이티브 st.tabs()로 교체.
@@ -2784,7 +2793,19 @@ def main():
         </div>
         """, unsafe_allow_html=True)
 
-        for prop in extraction_proposals:
+        # [수정] 옵션마다 색상이 항상 녹색 고정이었음 - Lead Candidates/Patent Search
+        # 탭에서 이미 쓰던 것과 같은 5색 로테이션 팔레트를 적용해서 옵션별로
+        # 시각적으로 구분되게 함.
+        EXTRACTION_OPTION_COLORS = [
+            {"light": "#fef2f2", "border": "#fecaca", "accent": "#ef4444", "text": "#b91c1c", "solid": "#dc2626"},
+            {"light": "#eff6ff", "border": "#bfdbfe", "accent": "#3b82f6", "text": "#1d4ed8", "solid": "#2563eb"},
+            {"light": "#ecfdf5", "border": "#a7f3d0", "accent": "#10b981", "text": "#047857", "solid": "#059669"},
+            {"light": "#fffbeb", "border": "#fde68a", "accent": "#f59e0b", "text": "#b45309", "solid": "#d97706"},
+            {"light": "#fdf4ff", "border": "#f5d0fe", "accent": "#d946ef", "text": "#a21caf", "solid": "#c026d3"},
+        ]
+
+        for opt_idx, prop in enumerate(extraction_proposals):
+            pal = EXTRACTION_OPTION_COLORS[opt_idx % len(EXTRACTION_OPTION_COLORS)]
             paper_url = prop.get('evidence_paper_url', '#')
             scholar_url = prop.get('evidence_scholar_url', paper_url)
             patent_url = prop.get('evidence_patent_url', '#')
@@ -2800,48 +2821,48 @@ def main():
                 s_detail = step_obj.get('detail', '')
                 s_svg = step_obj.get('svg', '')
 
-                steps_timeline_html += f"""<div style="display:flex; gap:16px; margin-bottom:16px; align-items:stretch; background:#f8fafc; border:1.5px solid #e2e8f0; border-left:4px solid #059669; border-radius:12px; padding:14px 18px; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+                steps_timeline_html += f"""<div style="display:flex; gap:16px; margin-bottom:16px; align-items:stretch; background:#f8fafc; border:1.5px solid #e2e8f0; border-left:4px solid {pal['solid']}; border-radius:12px; padding:14px 18px; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
 <div style="width:110px; height:80px; flex-shrink:0; border-radius:8px; overflow:hidden; border:1px solid #cbd5e1; display:flex; align-items:center; justify-content:center; background:#ffffff;">
 <img src="{s_svg}" style="width:100%; height:100%; object-fit:cover;" alt="{s_title}" />
 </div>
 <div style="flex:1;">
 <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-<span style="background:#059669; color:#ffffff; font-weight:800; font-size:12px; padding:2px 10px; border-radius:12px;">STEP {s_num}</span>
-<span style="font-size:15px; font-weight:800; color:#065f46;">{s_title}</span>
+<span style="background:{pal['solid']}; color:#ffffff; font-weight:800; font-size:12px; padding:2px 10px; border-radius:12px;">STEP {s_num}</span>
+<span style="font-size:15px; font-weight:800; color:{pal['text']};">{s_title}</span>
 </div>
 <div style="font-size:13.5px; color:#1e293b; line-height:1.65; font-weight:500;">{s_detail}</div>
 </div>
 </div>"""
 
-            card_html = f"""<div style="background:#ffffff; border:2px solid #a7f3d0; border-top:6px solid #059669; border-radius:18px; padding:24px; margin-bottom:28px; box-shadow:0 8px 30px rgba(0,0,0,0.07);">
+            card_html = f"""<div style="background:#ffffff; border:2px solid {pal['border']}; border-top:6px solid {pal['solid']}; border-radius:18px; padding:24px; margin-bottom:28px; box-shadow:0 8px 30px rgba(0,0,0,0.07);">
 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
 <div style="display:flex; align-items:center; gap:12px;">
-<span style="background:#059669; color:#ffffff; font-weight:800; font-size:14px; padding:6px 16px; border-radius:20px;">Option #{prop['rank']}</span>
-<span style="font-size:19px; font-weight:800; color:#065f46;">{prop['name']}</span>
+<span style="background:{pal['solid']}; color:#ffffff; font-weight:800; font-size:14px; padding:6px 16px; border-radius:20px;">Option #{prop['rank']}</span>
+<span style="font-size:19px; font-weight:800; color:{pal['text']};">{prop['name']}</span>
 </div>
-<span style="background:#ecfdf5; color:#047857; font-weight:800; font-size:13.5px; padding:6px 14px; border-radius:10px; border:1.5px solid #a7f3d0;">{prop['yield_boost']}</span>
+<span style="background:{pal['light']}; color:{pal['text']}; font-weight:800; font-size:13.5px; padding:6px 14px; border-radius:10px; border:1.5px solid {pal['border']};">{prop['yield_boost']}</span>
 </div>
 
 <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; font-size:13.5px;">
-<div style="background:#f0fdf4; border:1.5px solid #bbf7d0; padding:14px 16px; border-radius:12px;">
-<div style="color:#166534; font-weight:800; font-size:12px; margin-bottom:4px; letter-spacing:0.04em;">공정 제어 파라미터 (PROCESS CONTROL PARAMETERS)</div>
+<div style="background:{pal['light']}; border:1.5px solid {pal['border']}; padding:14px 16px; border-radius:12px;">
+<div style="color:{pal['text']}; font-weight:800; font-size:12px; margin-bottom:4px; letter-spacing:0.04em;">공정 제어 파라미터 (PROCESS CONTROL PARAMETERS)</div>
 <div style="color:#0f172a; font-weight:700; font-size:14px;">{prop['condition']}</div>
 </div>
-<div style="background:#f0fdf4; border:1.5px solid #bbf7d0; padding:14px 16px; border-radius:12px;">
-<div style="color:#166534; font-weight:800; font-size:12px; margin-bottom:4px; letter-spacing:0.04em;">타겟 유효 화학 성분 (TARGET PHYTOCHEMICAL CATEGORY)</div>
+<div style="background:{pal['light']}; border:1.5px solid {pal['border']}; padding:14px 16px; border-radius:12px;">
+<div style="color:{pal['text']}; font-weight:800; font-size:12px; margin-bottom:4px; letter-spacing:0.04em;">타겟 유효 화학 성분 (TARGET PHYTOCHEMICAL CATEGORY)</div>
 <div style="color:#0f172a; font-weight:700; font-size:14px;">{prop['target_components']}</div>
 </div>
 </div>
 
 <div style="margin-bottom:20px;">
-<div style="font-size:16px; font-weight:800; color:#065f46; margin-bottom:14px;">
+<div style="font-size:16px; font-weight:800; color:{pal['text']}; margin-bottom:14px;">
 📋 단계별 정밀 공정 시각화 프로토콜 (Step-by-Step Visualized SOP Timeline)
 </div>
 {steps_timeline_html}
 </div>
 
-<div style="background:#f0fdf4; border:1.5px solid #bbf7d0; border-left:5px solid #10b981; padding:14px 18px; border-radius:12px; font-size:14px; color:#1e293b; line-height:1.7; margin-bottom:20px;">
-<strong style="color:#065f46; font-size:14.5px;">기술 메커니즘 근거 (Technical Rationale):</strong> {prop['rationale']}
+<div style="background:{pal['light']}; border:1.5px solid {pal['border']}; border-left:5px solid {pal['solid']}; padding:14px 18px; border-radius:12px; font-size:14px; color:#1e293b; line-height:1.7; margin-bottom:20px;">
+<strong style="color:{pal['text']}; font-size:14.5px;">기술 메커니즘 근거 (Technical Rationale):</strong> {prop['rationale']}
 </div>
 
 <div style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:12px; padding:16px 20px;">
@@ -2875,12 +2896,20 @@ def main():
                 st.warning(f"⚠️ [Option #{prop.get('rank', 1)}] PDF 생성 실패: {e}")
 
             if single_pdf_bytes:
-                b_left, b_right = st.columns([2.6, 1.4])
-                with b_left:
-                    st.markdown(f"<div style='font-size:12px; font-weight:700; color:#047857; padding-top:6px;'>💡 [Option #{prop.get('rank', 1)}] 표준 공정 전용 PDF 보고서를 단독 저장할 수 있습니다.</div>", unsafe_allow_html=True)
-                with b_right:
+                # [수정] 아이콘을 텍스트 속 이모지가 아니라 옵션 색상 그라디언트
+                # 배지로 만들고, 제목/부제 위계를 나눠서 좀 더 정돈된 다운로드
+                # 카드 형태로 바꿈.
+                dl_icon_col, dl_text_col, dl_btn_col = st.columns([0.5, 3.3, 1.7])
+                with dl_icon_col:
+                    st.markdown(f"""<div style="width:42px; height:42px; border-radius:12px; background:linear-gradient(135deg, {pal['solid']} 0%, {pal['text']} 100%); display:flex; align-items:center; justify-content:center; font-size:19px; box-shadow:0 3px 10px rgba(0,0,0,0.18); margin-top:2px;">📄</div>""", unsafe_allow_html=True)
+                with dl_text_col:
+                    st.markdown(f"""<div style="padding-top:3px;">
+                        <div style="font-weight:800; font-size:13.5px; color:{pal['text']};">Option #{prop.get('rank', 1)} 표준 공정 리포트</div>
+                        <div style="font-size:11.5px; color:#64748b; margin-top:1px;">PDF 형식 · 이 옵션만 단독 저장</div>
+                    </div>""", unsafe_allow_html=True)
+                with dl_btn_col:
                     st.download_button(
-                        label=f"📄 [Option #{prop.get('rank', 1)}] PDF 다운로드",
+                        label="⬇ 다운로드",
                         data=single_pdf_bytes,
                         file_name=f"{result.get('query_resource')}_Option_{prop.get('rank', 1)}_추출프로토콜.pdf",
                         mime="application/pdf",
