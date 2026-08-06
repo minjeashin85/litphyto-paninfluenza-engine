@@ -8,6 +8,7 @@ openpyxl>=3.1.0
 networkx>=3.0
 rdkit>=2022.09.1
 pubchempy>=1.0.4
+reportlab>=4.0.0
 
 # [의도적으로 제외] torch, torch-geometric
 # models/gnn_predictor.py에 PyTorch GIN 모델 클래스가 정의는 돼 있지만

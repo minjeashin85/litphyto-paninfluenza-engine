@@ -117,69 +117,44 @@ st.markdown("""
         color: #ffffff !important;
         box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25) !important;
     }
-    /* [수정] CHROME BROWSER TAB STYLE FOR NAVIGATION RADIO TABS (Scope to .safari-nav-wrapper) */
-    .safari-nav-wrapper div[data-testid="stRadio"],
-    .safari-nav-wrapper div[data-testid="stRadio"] > div,
-    .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] {
+    /* [수정] st.tabs() 네이티브 컴포넌트를 크롬탭처럼 스타일링.
+       BaseWeb의 data-baseweb 속성을 타겟팅함 - Streamlit 내부 data-testid보다
+       훨씬 안정적으로 버전 간 유지되는 식별자임. */
+    div[data-baseweb="tab-list"] {
         width: 100% !important;
-        max-width: 100% !important;
-        display: flex !important;
-        flex-direction: row !important;
-        box-sizing: border-box !important;
-    }
-    .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] {
-        background: #dee1e6 !important;
-        border: none !important;
-        padding: 8px 10px 0 10px !important;
-        border-radius: 0 0 10px 10px !important;
         gap: 8px !important;
+        background: #dee1e6 !important;
+        padding: 8px 10px 0 10px !important;
+        border-radius: 10px 10px 0 0 !important;
         box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.04) !important;
     }
-    .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label {
+    button[data-baseweb="tab"] {
+        flex: 1 1 0 !important;
         background: #c7cbd1 !important;
-        border: none !important;
         border-radius: 10px 10px 0 0 !important;
         padding: 14px 20px !important;
-        margin: 0 !important;
-        color: #3c4043 !important;
         font-size: 14px !important;
         font-weight: 600 !important;
-        transition: all 0.18s ease !important;
-        cursor: pointer !important;
-        flex: 1 1 20% !important;
-        width: 20% !important;
-        min-width: 0 !important;
-        max-width: 20% !important;
+        color: #3c4043 !important;
         justify-content: center !important;
-        text-align: center !important;
-        box-sizing: border-box !important;
-        position: relative !important;
-        top: 1px !important;
+        transition: all 0.18s ease !important;
     }
-    .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label div[data-testid="stMarkdownContainer"] p {
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        font-size: 14px !important;
-        margin: 0 !important;
-        line-height: 1.3 !important;
-        text-align: center !important;
-    }
-    /* Hide Radio Circles Completely inside Safari Nav Wrapper */
-    .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:first-child {
-        display: none !important;
-    }
-    .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
+    button[data-baseweb="tab"]:hover {
         background: #eef0f2 !important;
         color: #0f172a !important;
     }
-    .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-checked="true"],
-    .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) {
+    button[data-baseweb="tab"][aria-selected="true"] {
         background: #ffffff !important;
         color: #059669 !important;
         font-weight: 800 !important;
         box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.06) !important;
-        border-bottom: 3px solid #059669 !important;
+    }
+    div[data-baseweb="tab-highlight"] {
+        background-color: #059669 !important;
+        height: 3px !important;
+    }
+    div[data-baseweb="tab-border"] {
+        display: none !important;
     }
     /* FIXED EXACT EQUAL HEIGHT FOR ALL 4 METRIC CARDS */
     .metric-card {
@@ -1148,7 +1123,7 @@ def generate_extraction_method_proposals(query_resource: str, extract_part: str)
                     {
                         "step_num": "03",
                         "title": "초임계 CO₂ 순환 침출 (Supercritical Fluid Extraction)",
-                        "detail": "40 MPa 고압 하에 45°C 항온 상태에서 120분간 등압 순환하여 {clean_plant} 유효 분획물을 고용해도 상태로 용출시킵니다.",
+                        "detail": f"40 MPa 고압 하에 45°C 항온 상태에서 120분간 등압 순환하여 {clean_plant} 유효 분획물을 고용해도 상태로 용출시킵니다.",
                         "svg": get_extraction_step_svg(3, "Supercritical Fluid Extraction")
                     },
                     {
@@ -1160,7 +1135,7 @@ def generate_extraction_method_proposals(query_resource: str, extract_part: str)
                     {
                         "step_num": "05",
                         "title": "동결건조 & HPLC 유효성분 분석 (Freeze Drying & HPLC Assay)",
-                        "detail": "진공 동결건조 후 HPLC-PDA로 {clean_plant} 유효 성분 수율을 최종 검증합니다.",
+                        "detail": f"진공 동결건조 후 HPLC-PDA로 {clean_plant} 유효 성분 수율을 최종 검증합니다.",
                         "svg": get_extraction_step_svg(5, "Freeze Drying & HPLC Assay")
                     }
                 ],
@@ -1278,19 +1253,23 @@ def generate_single_protocol_pdf_bytes(prop: dict, plant_name: str, extract_part
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
     from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
     clean_p_name = plant_name.split("(")[0].strip()
     clean_p_part = extract_part.split("(")[0].strip()
 
+    # [버그 수정] 원본은 font_path = r"C:\Windows\Fonts\malgun.ttf" 를 썼는데
+    # 이 경로는 Windows에만 존재함. Streamlit Cloud(리눅스)에서는 항상
+    # os.path.exists()가 False라 조용히 Helvetica로 폴백되고, Helvetica는
+    # 한글 글리프가 없어서 PDF의 모든 한글이 빈칸/깨짐으로 나오고 있었음.
+    # ReportLab에 내장된 한글 CID 폰트(외부 파일 불필요, OS 무관하게 항상 동작)로
+    # 교체함.
     font_name = "Helvetica"
-    font_path = r"C:\Windows\Fonts\malgun.ttf"
-    if os.path.exists(font_path):
-        try:
-            pdfmetrics.registerFont(TTFont("Malgun", font_path))
-            font_name = "Malgun"
-        except Exception:
-            pass
+    try:
+        pdfmetrics.registerFont(UnicodeCIDFont("HYSMyeongJo-Medium"))
+        font_name = "HYSMyeongJo-Medium"
+    except Exception:
+        pass
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -1374,7 +1353,7 @@ def generate_single_protocol_pdf_bytes(prop: dict, plant_name: str, extract_part
     story.append(Spacer(1, 10))
 
     # SOP Steps
-    story.append(Paragraph("<b>📋 단계별 정밀 표준 공정 프로토콜 (SOP Timeline)</b>", heading_style))
+    story.append(Paragraph("<b>단계별 정밀 표준 공정 프로토콜 (SOP Timeline)</b>", heading_style))
     for s in prop.get("sop_steps", []):
         s_num = s.get("step_num", "01")
         s_title = s.get("title", "")
@@ -1385,7 +1364,7 @@ def generate_single_protocol_pdf_bytes(prop: dict, plant_name: str, extract_part
 
     story.append(Spacer(1, 6))
     # Rationale
-    story.append(Paragraph("<b>💡 생물공학적 및 화학적 메커니즘 근거 (Technical Rationale)</b>", heading_style))
+    story.append(Paragraph("<b>생물공학적 및 화학적 메커니즘 근거 (Technical Rationale)</b>", heading_style))
     story.append(Paragraph(f"{prop.get('rationale', '')}", body_style))
 
     doc.build(story)
@@ -1751,7 +1730,10 @@ def render_detailed_influenza_lifecycle_pathway_diagram(query_resource: str, ext
     STAGE_MAP = [BASE_STAGES[i % len(BASE_STAGES)] for i in range(n_stages)]
 
     import os, base64
-    img_path = "static/h1n1_lifecycle_diagram_notitle.png"
+    # [수정] 사용자가 지정한 clean 버전을 우선 사용하도록 순서 변경.
+    img_path = "static/h1n1_lifecycle_diagram_clean.png"
+    if not os.path.exists(img_path):
+        img_path = "static/h1n1_lifecycle_diagram_notitle.png"
     if not os.path.exists(img_path):
         img_path = "static/h1n1_lifecycle_diagram.png"
         
@@ -2082,6 +2064,7 @@ def main():
 
         with col1:
             plant_presets = [
+                "Direct Input (직접 입력)",
                 "Ginkgo biloba (은행나무)",
                 "Panax ginseng (인삼)",
                 "Curcuma longa (강황/울금)",
@@ -2089,10 +2072,9 @@ def main():
                 "Allium sativum (마늘)",
                 "Zingiber officinale (생강)",
                 "Glycyrrhiza glabra (감초)",
-                "Artemisia annua (개낙)",
+                "Artemisia annua (개똥쑥)",
                 "Scutellaria baicalensis (황금)",
-                "Justicia procumbens (쥐꼬리망초)",
-                "Direct Input (직접 입력)"
+                "Justicia procumbens (쥐꼬리망초)"
             ]
             selected_plant_preset = st.selectbox(
                 "Plant Species Binomial Name (식물 학명):",
@@ -2189,34 +2171,89 @@ def main():
         api_key_to_pass = user_llm_key_input if 'user_llm_key_input' in locals() and user_llm_key_input else None
 
         # --- High-Tech Lab Loading & Progress Interface ---
+        # [수정] 세련된 애니메이션(펄스 아이콘, 시머 스윕, 스피너)으로 교체하고
+        # 전체 소요 시간을 기존 대비 2배로 늘림(2.5초 -> 5초). 큰 점프 대신
+        # 단계마다 진행률을 한 번 더 세분화해서 바가 부드럽게 움직이도록 함.
         progress_placeholder = st.empty()
         status_placeholder = st.empty()
 
         with status_placeholder.container():
             st.markdown("""
-            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 20px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 20px; color: #ffffff;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 24px;">🔬</span>
+            <style>
+            @keyframes lp_pulse {{
+                0%, 100% {{ box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45); }}
+                50% {{ box-shadow: 0 0 0 10px rgba(56, 189, 248, 0); }}
+            }}
+            @keyframes lp_shimmer {{
+                0% {{ transform: translateX(-100%); }}
+                100% {{ transform: translateX(250%); }}
+            }}
+            @keyframes lp_spin {{
+                from {{ transform: rotate(0deg); }}
+                to {{ transform: rotate(360deg); }}
+            }}
+            @keyframes lp_fadein {{
+                from {{ opacity: 0; transform: translateY(4px); }}
+                to {{ opacity: 1; transform: translateY(0); }}
+            }}
+            .lp_card {{
+                background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+                padding: 20px; border-radius: 12px; border: 1px solid #334155;
+                margin-bottom: 20px; color: #ffffff; position: relative;
+                overflow: hidden; animation: lp_fadein 0.4s ease;
+            }}
+            .lp_card::before {{
+                content: ""; position: absolute; top: 0; left: 0;
+                width: 40%; height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(56,189,248,0.10), transparent);
+                animation: lp_shimmer 2.2s linear infinite;
+            }}
+            .lp_icon_badge {{
+                display: inline-flex; align-items: center; justify-content: center;
+                width: 34px; height: 34px; border-radius: 50%;
+                background: rgba(56, 189, 248, 0.15);
+                animation: lp_pulse 1.6s ease-out infinite;
+                font-size: 17px;
+            }}
+            .lp_spinner {{
+                width: 12px; height: 12px; border-radius: 50%;
+                border: 2px solid rgba(56, 189, 248, 0.25);
+                border-top-color: #38bdf8;
+                animation: lp_spin 0.8s linear infinite;
+                display: inline-block; flex-shrink: 0;
+            }}
+            </style>
+            <div class="lp_card">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; position:relative; z-index:1;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span class="lp_icon_badge">🔬</span>
                         <strong style="font-size: 18px; color: #38bdf8;">LitPhyto AI Pipeline Running...</strong>
                     </div>
                     <span style="font-size: 13px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3);">
                         Target: {target_virus} | Extract: {query_input} ({extract_part})
                     </span>
                 </div>
-                <div style="font-family: monospace; font-size: 13px; color: #94a3b8; id: live-log-text;">
-                    ▶ Executing 4-Stage Deep Antiviral & Phytochemical Intelligence Pipeline...
+                <div style="display:flex; align-items:center; gap:9px; font-family: monospace; font-size: 13px; color: #94a3b8; position:relative; z-index:1;">
+                    <span class="lp_spinner"></span>
+                    <span>Executing 4-Stage Deep Antiviral & Phytochemical Intelligence Pipeline...</span>
                 </div>
             </div>
             """.format(target_virus=target_virus, query_input=query_input, extract_part=extract_part), unsafe_allow_html=True)
 
+
         bar = progress_placeholder.progress(0, text="[Stage 1/4] Mining Literature & PubChem Chemical Databases...")
-        time.sleep(0.6)
+        time.sleep(0.5)
+        bar.progress(15, text="[Stage 1/4] Mining Literature & PubChem Chemical Databases...")
+        time.sleep(0.7)
 
         bar.progress(30, text=f"[Stage 2/4] Synthesizing Virtual Profile Twin of {query_input} ({extract_part})...")
         time.sleep(0.7)
+        bar.progress(48, text=f"[Stage 2/4] Synthesizing Virtual Profile Twin of {query_input} ({extract_part})...")
+        time.sleep(0.7)
 
         bar.progress(65, text=f"[Stage 3/4] Running 3D Conformer GNN Binding Affinity Docking against Influenza {target_virus}...")
+        time.sleep(0.8)
+        bar.progress(80, text=f"[Stage 3/4] Running 3D Conformer GNN Binding Affinity Docking against Influenza {target_virus}...")
         time.sleep(0.8)
 
         bar.progress(90, text="[Stage 4/4] Inferring Causal MOA & Multitarget Antiviral Pathways...")
@@ -2237,7 +2274,7 @@ def main():
                 gemini_api_key=api_key_to_pass
             )
             bar.progress(100, text="✅ Analysis Complete!")
-            time.sleep(0.4)
+            time.sleep(0.8)
         except Exception as e:
             st.error(f"파이프라인 실행 오류: {e}")
         finally:
@@ -2405,29 +2442,15 @@ def main():
         "Excel / PDF Report Download"
     ]
 
-    if "main_tab_selection" not in st.session_state:
-        st.session_state["main_tab_selection"] = raw_tab_names[0]
-
-    # Clean matching logic for session state
-    current_sel = st.session_state.get("main_tab_selection", raw_tab_names[0])
-    if current_sel not in raw_tab_names:
-        current_sel = raw_tab_names[0]
-
-    st.markdown('<div class="safari-nav-wrapper">', unsafe_allow_html=True)
-    selected_tab = st.radio(
-        "Navigation Tabs:",
-        options=raw_tab_names,
-        index=raw_tab_names.index(current_sel),
-        key="main_tab_selection",
-        horizontal=True,
-        label_visibility="collapsed"
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    tab_options = raw_tab_names
+    # [수정] st.radio + CSS 해킹으로 만든 가짜 탭 -> 네이티브 st.tabs()로 교체.
+    # 라디오 방식은 Streamlit 내부 DOM 구조(data-testid 등)에 의존하는 CSS
+    # 선택자를 썼는데, 배포 환경의 Streamlit 버전에 따라 내부 구조가 달라지면
+    # 크롬탭 스타일이 전혀 안 먹힐 수 있음(실제로 그렇게 됐음). st.tabs()는
+    # Streamlit이 공식 지원하는 컴포넌트라 항상 안정적으로 탭 형태로 렌더링됨.
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(raw_tab_names)
 
     # Render tab content based on active session state selection
-    if selected_tab == tab_options[0]:
+    with tab1:
         # Tab 1: Antiviral Lead Candidates Profiles
         st.markdown(f"""
         <div style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding:14px 20px; border-radius:12px; border-left:5px solid #38bdf8; margin-bottom:20px; color:#ffffff;">
@@ -2592,7 +2615,7 @@ def main():
                         st.json(aff_df_list)
 
     # Tab 2: Antiviral MOA Pathway Graphical Diagram
-    elif selected_tab == tab_options[1]:
+    with tab2:
         st.markdown("""
         <div style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding:14px 20px; border-radius:12px; border-left:5px solid #0284c7; margin-bottom:20px; color:#ffffff;">
             <div style="font-size:16px; font-weight:800; color:#38bdf8;">Antiviral MOA Pathway Graphical Diagram</div>
@@ -2624,7 +2647,7 @@ def main():
         st.latex(r"S_{synergy} = E_{combo} - (E_A + E_B - E_A \cdot E_B)")
 
     # Tab 3: Optimal Phytochemical Extraction Method Proposals (최적 식물 추출법 제안)
-    elif selected_tab == tab_options[2]:
+    with tab3:
         import textwrap
 
         st.markdown(textwrap.dedent("""
@@ -2836,28 +2859,38 @@ def main():
             st.markdown(textwrap.dedent(card_html), unsafe_allow_html=True)
 
             # Compact right-aligned PDF Download button (Explicitly stating Option number)
-            single_pdf_bytes = generate_single_protocol_pdf_bytes(
-                prop,
-                result.get('query_resource', 'Plant'),
-                result.get('extract_part', 'Leaves')
-            )
-            
-            b_left, b_right = st.columns([2.6, 1.4])
-            with b_left:
-                st.markdown(f"<div style='font-size:12px; font-weight:700; color:#047857; padding-top:6px;'>💡 [Option #{prop.get('rank', 1)}] 표준 공정 전용 PDF 보고서를 단독 저장할 수 있습니다.</div>", unsafe_allow_html=True)
-            with b_right:
-                st.download_button(
-                    label=f"📄 [Option #{prop.get('rank', 1)}] PDF 다운로드",
-                    data=single_pdf_bytes,
-                    file_name=f"{result.get('query_resource')}_Option_{prop.get('rank', 1)}_추출프로토콜.pdf",
-                    mime="application/pdf",
-                    key=f"dl_single_pdf_{prop.get('rank', 1)}",
-                    use_container_width=True
+            # [수정] reportlab 임포트/생성 실패가 앱 전체를 죽이지 않도록 방어적으로 감쌈
+            # (requirements.txt에 reportlab이 빠져 있어서 이 부분이 통째로 앱을
+            # 죽이고 있었음 - 지금은 requirements.txt에 추가했지만, 혹시 모를
+            # 다른 예외 상황에도 이 옵션만 다운로드 버튼이 빠지고 나머지는
+            # 정상 동작하도록 함).
+            try:
+                single_pdf_bytes = generate_single_protocol_pdf_bytes(
+                    prop,
+                    result.get('query_resource', 'Plant'),
+                    result.get('extract_part', 'Leaves')
                 )
+            except Exception as e:
+                single_pdf_bytes = None
+                st.warning(f"⚠️ [Option #{prop.get('rank', 1)}] PDF 생성 실패: {e}")
+
+            if single_pdf_bytes:
+                b_left, b_right = st.columns([2.6, 1.4])
+                with b_left:
+                    st.markdown(f"<div style='font-size:12px; font-weight:700; color:#047857; padding-top:6px;'>💡 [Option #{prop.get('rank', 1)}] 표준 공정 전용 PDF 보고서를 단독 저장할 수 있습니다.</div>", unsafe_allow_html=True)
+                with b_right:
+                    st.download_button(
+                        label=f"📄 [Option #{prop.get('rank', 1)}] PDF 다운로드",
+                        data=single_pdf_bytes,
+                        file_name=f"{result.get('query_resource')}_Option_{prop.get('rank', 1)}_추출프로토콜.pdf",
+                        mime="application/pdf",
+                        key=f"dl_single_pdf_{prop.get('rank', 1)}",
+                        use_container_width=True
+                    )
             st.markdown("<div style='margin-bottom:24px;'></div>", unsafe_allow_html=True)
 
     # Tab 4: Patent Search (특허 검색) - '글로벌' 단어 삭제!
-    elif selected_tab == tab_options[3]:
+    with tab4:
         st.markdown("""
         <div style="background:linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); padding:14px 20px; border-radius:12px; border-left:5px solid #818cf8; margin-bottom:20px; color:#ffffff;">
             <div style="font-size:16px; font-weight:800; color:#a5b4fc;">Patent Search (특허 검색)</div>
@@ -2963,7 +2996,7 @@ def main():
         st.session_state['all_patents_for_export'] = all_patents_for_export
 
     # Tab 5: Excel / PDF Download (통합 리포트 다운로드)
-    elif selected_tab == tab_options[4]:
+    with tab5:
         st.markdown("""
         <div style="background:linear-gradient(135deg, #1f2937 0%, #111827 100%); padding:14px 20px; border-radius:12px; border-left:5px solid #10b981; margin-bottom:20px; color:#ffffff;">
             <div style="font-size:16px; font-weight:800; color:#34d399;">Excel / PDF Download (통합 리포트 다운로드)</div>
