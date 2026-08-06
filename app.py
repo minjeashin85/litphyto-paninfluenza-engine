@@ -117,7 +117,10 @@ st.markdown("""
         color: #ffffff !important;
         box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25) !important;
     }
-    /* APPLE SAFARI TAB STYLE FOR NAVIGATION RADIO TABS (Scope to .safari-nav-wrapper) */
+    /* [수정] CHROME BROWSER TAB STYLE FOR NAVIGATION RADIO TABS (Scope to .safari-nav-wrapper) */
+    /* 기존 Safari 스타일(둥근 필박스 라디오 그룹)을 크롬 브라우저 탭 스타일로 교체함:
+       탭 상단만 둥글고, 서로 붙어있는 사다리꼴형 탭이 아니라 여유 있게 간격을 둔
+       개별 탭 카드 형태로 만들고, 전체 폭을 넉넉하게 꽉 채우도록 함. */
     .safari-nav-wrapper div[data-testid="stRadio"],
     .safari-nav-wrapper div[data-testid="stRadio"] > div,
     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] {
@@ -128,40 +131,41 @@ st.markdown("""
         box-sizing: border-box !important;
     }
     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] {
-        background: #e5e7eb !important;
-        border: 1.5px solid #cbd5e1 !important;
-        border-top: none !important;
-        padding: 5px !important;
-        border-radius: 0 0 16px 16px !important;
-        gap: 4px !important;
-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+        background: #dee1e6 !important;
+        border: none !important;
+        padding: 8px 10px 0 10px !important;
+        border-radius: 0 0 10px 10px !important;
+        gap: 8px !important;
+        box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.04) !important;
     }
     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label {
-        background: transparent !important;
+        background: #c7cbd1 !important;
         border: none !important;
-        border-radius: 9px !important;
-        padding: 10px 4px !important;
+        border-radius: 10px 10px 0 0 !important;
+        padding: 14px 20px !important;
         margin: 0 !important;
-        color: #475569 !important;
-        font-size: 13px !important;
+        color: #3c4043 !important;
+        font-size: 14px !important;
         font-weight: 600 !important;
-        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        transition: all 0.18s ease !important;
         cursor: pointer !important;
         flex: 1 1 20% !important;
         width: 20% !important;
-        min-width: 20% !important;
+        min-width: 0 !important;
         max-width: 20% !important;
         justify-content: center !important;
         text-align: center !important;
         box-sizing: border-box !important;
+        position: relative !important;
+        top: 1px !important;
     }
     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label div[data-testid="stMarkdownContainer"] p {
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
-        font-size: 13px !important;
+        font-size: 14px !important;
         margin: 0 !important;
-        line-height: 1.2 !important;
+        line-height: 1.3 !important;
         text-align: center !important;
     }
     /* Hide Radio Circles Completely inside Safari Nav Wrapper */
@@ -169,15 +173,16 @@ st.markdown("""
         display: none !important;
     }
     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
-        background: rgba(255, 255, 255, 0.65) !important;
+        background: #eef0f2 !important;
         color: #0f172a !important;
     }
     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-checked="true"],
     .safari-nav-wrapper div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) {
         background: #ffffff !important;
-        color: #0f172a !important;
+        color: #059669 !important;
         font-weight: 800 !important;
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+        box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.06) !important;
+        border-bottom: 3px solid #059669 !important;
     }
     /* FIXED EXACT EQUAL HEIGHT FOR ALL 4 METRIC CARDS */
     .metric-card {
@@ -1642,7 +1647,7 @@ Return ONLY raw valid JSON array, no markdown text before or after."""
 
     # --- 3. Anthropic Claude API ---
     elif engine_choice == "claude":
-        target_model = model_version if model_version else "claude-3-5-sonnet-20241022"
+        target_model = model_version if model_version else "claude-sonnet-5"
         api_key = user_api_key.strip() or os.environ.get("ANTHROPIC_API_KEY", "").strip()
         if not api_key:
             return generate_extraction_method_proposals(query_resource, extract_part), "Anthropic Claude API Key가 입력되지 않았습니다. (식물 문헌 DB 엔진으로 전환)"
@@ -2075,8 +2080,6 @@ def main():
     """, unsafe_allow_html=True)
 
     with st.container():
-        st.markdown('<div class="control-panel-box">', unsafe_allow_html=True)
-
         col1, col2, col3, col4 = st.columns([1.5, 1.0, 1.0, 1.3])
 
         with col1:
@@ -2375,30 +2378,21 @@ def main():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- Display Navigation Tabs (macOS Safari Browser Style Header & 100% Full Width Tabs) ---
+    # [수정] macOS Safari 트래픽라이트 스타일 -> 크롬 브라우저 창 바 스타일로 교체.
+    # 탭 스트립(.safari-nav-wrapper CSS)이 이미 크롬탭 형태로 바뀌었으므로,
+    # 그 위에 얹히는 바도 심플한 크롬 윈도우 바 형태로 맞춤.
     st.markdown("""
-    <div style="background: linear-gradient(180deg, #f3f4f6 0%, #e5e7eb 100%); border: 1.5px solid #cbd5e1; border-radius: 16px 16px 0 0; padding: 10px 20px 8px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 12px rgba(0,0,0,0.04); margin-bottom:-2px;">
-        <div style="display:flex; align-items:center; gap:14px;">
-            <div style="display:flex; align-items:center; gap:8px;">
-                <span style="width:12px; height:12px; border-radius:50%; background:#ff5f56; display:inline-block; border:0.5px solid #e0443e;"></span>
-                <span style="width:12px; height:12px; border-radius:50%; background:#ffbd2e; display:inline-block; border:0.5px solid #dea123;"></span>
-                <!-- 3rd Green Dot: Highlighted Active Page Indicator -->
-                <span style="width:13px; height:13px; border-radius:50%; background:#10b981; display:inline-flex; align-items:center; justify-content:center; border:1px solid #059669; box-shadow:0 0 8px rgba(16, 185, 129, 0.8); color:#ffffff; font-size:9px; font-weight:900;">✓</span>
-            </div>
-            <div style="height:14px; width:1px; background:#cbd5e1; margin:0 4px;"></div>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="4" ry="4"></rect>
-                <line x1="9" y1="3" x2="9" y2="21"></line>
+    <div style="background: #dee1e6; border-radius: 10px 10px 0 0; padding: 10px 18px 0 18px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 3a9 9 0 0 1 0 18 9 9 0 0 1 0-18z"></path>
             </svg>
-            <div style="display:flex; align-items:center; gap:8px; color:#94a3b8; font-size:14px; font-weight:800; margin-left:4px;">
-                <span style="color:#64748b;">&lt;</span>
-                <span style="color:#cbd5e1;">&gt;</span>
-            </div>
+            <span style="font-size:12.5px; font-weight:700; color:#5f6368;">LitPhyto-PanInfluenza Engine — Results</span>
         </div>
-        <!-- Right: Active Page Indicator (3rd Green Dot Highlighted) -->
-        <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:#047857; background:#ecfdf5; border:1px solid #a7f3d0; padding:3px 12px; border-radius:12px;">
-            <span style="width:8px; height:8px; border-radius:50%; background:#10b981; display:inline-block;"></span>
-            <span>보고 있는 활성 페이지 (3번째 🟢 초록 동그라미 표기)</span>
+        <div style="display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:800; color:#047857; background:#e6f4ea; border:1px solid #a7f3d0; padding:3px 12px; border-radius:12px;">
+            <span style="width:7px; height:7px; border-radius:50%; background:#1a73e8; display:inline-block;"></span>
+            <span>분석 결과 페이지</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2722,7 +2716,7 @@ def main():
                 """, unsafe_allow_html=True)
                 selected_model_version = st.selectbox(
                     "Claude 모델 버전 선택:",
-                    options=["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
+                    options=["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5-20251001"],
                     index=0,
                     key="claude_version_select"
                 )
@@ -2761,9 +2755,15 @@ def main():
         extraction_proposals = st.session_state.get("extraction_proposals", [])
         engine_status_msg = st.session_state.get("extraction_engine_status_msg", "Local Bio-Literature Database Engine")
 
+        # [수정] API 호출이 실패해서 DB 엔진으로 자동 전환된 경우 눈에 띄게 경고 색상으로 표시.
+        # 기존엔 성공/실패 상관없이 항상 초록 박스라 에러가 나도 알아채기 어려웠음.
+        _is_fallback = ("오류" in engine_status_msg) or ("예외" in engine_status_msg) or ("입력되지 않았습니다" in engine_status_msg)
+        _status_bg, _status_border, _status_text = ("#fffbeb", "#fbbf24", "#92400e") if _is_fallback else ("#ecfdf5", "#a7f3d0", "#047857")
+        _status_icon = "⚠️" if _is_fallback else "✅"
+
         st.markdown(f"""
-        <div style="background:#ecfdf5; border:1.5px solid #a7f3d0; border-radius:10px; padding:12px 18px; margin-bottom:22px; font-size:13.5px; font-weight:800; color:#047857;">
-            현재 활성화된 추출 연구 엔진: <span style="color:#065f46;">{engine_status_msg}</span>
+        <div style="background:{_status_bg}; border:1.5px solid {_status_border}; border-radius:10px; padding:12px 18px; margin-bottom:22px; font-size:13.5px; font-weight:800; color:{_status_text};">
+            {_status_icon} 현재 활성화된 추출 연구 엔진: <span>{engine_status_msg}</span>
         </div>
         """, unsafe_allow_html=True)
 
