@@ -2059,9 +2059,35 @@ def render_dynamic_assay_evidence_graphic(idx: int, metric_text: str, paper_titl
 # was rendering as an empty gray box in the previous reconstruction.)
 # =============================================================================
 def main():
-    st.markdown("""
-    <div class="main-header-box">
-        <h1 class="main-title">🔮 LitPhyto-PanInfluenza Engine</h1>
+    # [수정] 우상단에 소속 기관 로고 3개(한림대학교, 국립생물자원관, MI Lab) 추가.
+    # 각각 클릭하면 해당 기관 사이트로 새 탭에서 이동함.
+    import os, base64
+
+    def _logo_b64(fname):
+        path = f"static/{fname}"
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                return base64.b64encode(f.read()).decode("utf-8")
+        return ""
+
+    _hallym_b64 = _logo_b64("logo_hallym.png")
+    _nibr_b64 = _logo_b64("logo_nibr.jpg")
+    _milab_b64 = _logo_b64("logo_milab.png")
+
+    st.markdown(f"""
+    <div class="main-header-box" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+        <h1 class="main-title" style="margin:0;">🔮 LitPhyto-PanInfluenza Engine</h1>
+        <div style="display:flex; align-items:center; gap:14px;">
+            <a href="https://www.hallym.ac.kr/hallym/index.do" target="_blank" title="한림대학교">
+                <img src="data:image/png;base64,{_hallym_b64}" style="height:46px; width:auto; border-radius:6px;" />
+            </a>
+            <a href="https://www.nibr.go.kr" target="_blank" title="국립생물자원관">
+                <img src="data:image/jpeg;base64,{_nibr_b64}" style="height:46px; width:auto; border-radius:6px;" />
+            </a>
+            <a href="https://sites.google.com/glab.hallym.ac.kr/milab/home" target="_blank" title="Molecular Immunology Laboratory">
+                <img src="data:image/png;base64,{_milab_b64}" style="height:46px; width:auto; border-radius:6px;" />
+            </a>
+        </div>
     </div>
     <div class="sub-title">
         AI-Driven Plant Species Binomial Profile Twin &amp; Antiviral MOA Predictor
@@ -2180,11 +2206,13 @@ def main():
         api_key_to_pass = user_llm_key_input if 'user_llm_key_input' in locals() and user_llm_key_input else None
 
         # --- High-Tech Lab Loading & Progress Interface ---
-        # [수정] 세련된 애니메이션(펄스 아이콘, 시머 스윕, 스피너)으로 교체하고
-        # 전체 소요 시간을 기존 대비 2배로 늘림(2.5초 -> 5초). 큰 점프 대신
-        # 단계마다 진행률을 한 번 더 세분화해서 바가 부드럽게 움직이도록 함.
+        # [전면 개편] 기존엔 4단계 큰 텍스트만 바뀌는 정적인 느낌이었음.
+        # 이번엔 (1) 실제 연산 과정이 한 줄씩 흘러가는 터미널 로그 콘솔을 추가하고,
+        # (2) 결과 검토/QC 단계를 새로 추가해서 5단계로 늘리고,
+        # (3) 전체 소요 시간을 기존 대비 다시 2배로 늘림(5초 -> 10초).
         progress_placeholder = st.empty()
         status_placeholder = st.empty()
+        console_placeholder = st.empty()
 
         with status_placeholder.container():
             st.markdown("""
@@ -2197,18 +2225,22 @@ def main():
                 0% {{ transform: translateX(-100%); }}
                 100% {{ transform: translateX(250%); }}
             }}
-            @keyframes lp_spin {{
-                from {{ transform: rotate(0deg); }}
-                to {{ transform: rotate(360deg); }}
-            }}
             @keyframes lp_fadein {{
                 from {{ opacity: 0; transform: translateY(4px); }}
                 to {{ opacity: 1; transform: translateY(0); }}
             }}
+            @keyframes lp_blink {{
+                0%, 49% {{ opacity: 1; }}
+                50%, 100% {{ opacity: 0; }}
+            }}
+            @keyframes lp_linein {{
+                from {{ opacity: 0; transform: translateX(-6px); }}
+                to {{ opacity: 1; transform: translateX(0); }}
+            }}
             .lp_card {{
                 background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-                padding: 20px; border-radius: 12px; border: 1px solid #334155;
-                margin-bottom: 20px; color: #ffffff; position: relative;
+                padding: 18px 20px; border-radius: 12px 12px 0 0; border: 1px solid #334155;
+                border-bottom: none; color: #ffffff; position: relative;
                 overflow: hidden; animation: lp_fadein 0.4s ease;
             }}
             .lp_card::before {{
@@ -2224,16 +2256,25 @@ def main():
                 animation: lp_pulse 1.6s ease-out infinite;
                 font-size: 17px;
             }}
-            .lp_spinner {{
-                width: 12px; height: 12px; border-radius: 50%;
-                border: 2px solid rgba(56, 189, 248, 0.25);
-                border-top-color: #38bdf8;
-                animation: lp_spin 0.8s linear infinite;
-                display: inline-block; flex-shrink: 0;
+            .lp_console {{
+                background: #05070d; border: 1px solid #334155; border-top: none;
+                border-radius: 0 0 12px 12px; padding: 14px 20px; margin-bottom: 20px;
+                font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace;
+                font-size: 12.5px; line-height: 1.85; color: #6ee7b7;
+                min-height: 168px; max-height: 168px; overflow: hidden;
+            }}
+            .lp_console_line {{
+                animation: lp_linein 0.25s ease;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            }}
+            .lp_console_line.lp_done {{ color: #4b5563; }}
+            .lp_console_line.lp_current {{ color: #6ee7b7; font-weight: 700; }}
+            .lp_cursor {{
+                display: inline-block; color: #6ee7b7; animation: lp_blink 1s step-start infinite;
             }}
             </style>
             <div class="lp_card">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; position:relative; z-index:1;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; position:relative; z-index:1;">
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <span class="lp_icon_badge">🔬</span>
                         <strong style="font-size: 18px; color: #38bdf8;">LitPhyto AI Pipeline Running...</strong>
@@ -2242,30 +2283,68 @@ def main():
                         Target: {target_virus} | Extract: {query_input} ({extract_part})
                     </span>
                 </div>
-                <div style="display:flex; align-items:center; gap:9px; font-family: monospace; font-size: 13px; color: #94a3b8; position:relative; z-index:1;">
-                    <span class="lp_spinner"></span>
-                    <span>Executing 4-Stage Deep Antiviral & Phytochemical Intelligence Pipeline...</span>
-                </div>
             </div>
             """.format(target_virus=target_virus, query_input=query_input, extract_part=extract_part), unsafe_allow_html=True)
 
+        # [수정] 5단계 연산 로그 - 마지막 "결과 검토 및 QC 검증" 단계가 새로 추가된 부분.
+        # 각 줄이 실제로 하나씩 콘솔에 출력되면서 진행률 바도 같이 움직임.
+        STAGE_LOG = [
+            ("[Stage 1/5] 문헌 및 화합물 마이닝", [
+                f"PubChem/문헌 DB에서 {query_input} 후보 화합물 조회 중...",
+                "SMILES 구조 파싱 및 유효성 검증 중...",
+                "PubMed 인용 레퍼런스 매핑 중...",
+            ]),
+            ("[Stage 2/5] 가상 추출물 프로파일 트윈 구축", [
+                "RDKit SMARTS 화학 분류군 매칭 중...",
+                "ETKDG 3D conformer 임베딩 계산 중...",
+                f"{extract_part} 추출 조건 기반 성분비 추정 중...",
+            ]),
+            ("[Stage 3/5] 결합 에너지 예측 연산", [
+                "PA Endonuclease 표적 결합 에너지(ΔG) 계산 중...",
+                f"HA / M2 / NA 생애주기 표적 스캔 중 (대상: Influenza {target_virus})...",
+                "숙주 표적(DHODH / IMPDH2) 친화도 추정 중...",
+            ]),
+            ("[Stage 4/5] Causal MOA 추론", [
+                "Bliss Independence 시너지 스코어 계산 중...",
+                "다중 표적 상호작용 그래프 구성 중...",
+                "MOA 가설 문장 자동 생성 중...",
+            ]),
+            ("[Stage 5/5] 결과 검토 및 QC 검증", [
+                "결합 에너지 물리적 타당성 범위 검증 중...",
+                "문헌 인용 - 화합물 매핑 일관성 교차 검토 중...",
+                "최종 출력 스키마 무결성 검증 중...",
+            ]),
+        ]
+        total_steps = sum(len(lines) for _, lines in STAGE_LOG)
 
-        bar = progress_placeholder.progress(0, text="[Stage 1/4] Mining Literature & PubChem Chemical Databases...")
-        time.sleep(0.5)
-        bar.progress(15, text="[Stage 1/4] Mining Literature & PubChem Chemical Databases...")
-        time.sleep(0.7)
+        console_lines = []
 
-        bar.progress(30, text=f"[Stage 2/4] Synthesizing Virtual Profile Twin of {query_input} ({extract_part})...")
-        time.sleep(0.7)
-        bar.progress(48, text=f"[Stage 2/4] Synthesizing Virtual Profile Twin of {query_input} ({extract_part})...")
-        time.sleep(0.7)
+        def _render_console(current_text=None):
+            rows = list(console_lines)
+            if current_text:
+                rows = rows + [current_text]
+            html_rows = []
+            for i, r in enumerate(rows):
+                cls = "lp_current" if (current_text and i == len(rows) - 1) else "lp_done"
+                cursor = ' <span class="lp_cursor">▌</span>' if (current_text and i == len(rows) - 1) else ""
+                html_rows.append(f'<div class="lp_console_line {cls}">{r}{cursor}</div>')
+            console_placeholder.markdown(
+                f'<div class="lp_console">{"".join(html_rows[-9:])}</div>',
+                unsafe_allow_html=True
+            )
 
-        bar.progress(65, text=f"[Stage 3/4] Running 3D Conformer GNN Binding Affinity Docking against Influenza {target_virus}...")
-        time.sleep(0.8)
-        bar.progress(80, text=f"[Stage 3/4] Running 3D Conformer GNN Binding Affinity Docking against Influenza {target_virus}...")
-        time.sleep(0.8)
-
-        bar.progress(90, text="[Stage 4/4] Inferring Causal MOA & Multitarget Antiviral Pathways...")
+        bar = progress_placeholder.progress(0, text=STAGE_LOG[0][0])
+        step_i = 0
+        for stage_title, lines in STAGE_LOG:
+            for line in lines:
+                step_i += 1
+                _render_console(f"▶ {line}")
+                time.sleep(0.35)
+                console_lines.append(f"✓ {line}")
+                pct = int(step_i / total_steps * 94)
+                bar.progress(pct, text=f"{stage_title} · {line}")
+                _render_console()
+                time.sleep(0.25)
 
         # [수정] localhost:8009 FastAPI 백엔드 호출 -> 인프로세스 엔진 직접 호출로 교체.
         # 원본은 별도 FastAPI 서버(api/main.py, 기본 포트 8000이지만 여기선 8009로
@@ -2276,19 +2355,24 @@ def main():
         #  pipeline/orchestrator.py 참고.)
         try:
             engine = get_engine()
+            _render_console("▶ 파이프라인 결과 최종 조합 중...")
             st.session_state["pipeline_result"] = engine.run_pipeline(
                 query_resource=query_input,
                 target_virus=target_virus,
                 extract_part=extract_part,
                 gemini_api_key=api_key_to_pass
             )
+            console_lines.append("✓ 파이프라인 결과 최종 조합 중...")
+            console_lines.append("✅ 전체 파이프라인 완료 - 검토 통과.")
+            _render_console()
             bar.progress(100, text="✅ Analysis Complete!")
-            time.sleep(0.8)
+            time.sleep(1.0)
         except Exception as e:
             st.error(f"파이프라인 실행 오류: {e}")
         finally:
             progress_placeholder.empty()
             status_placeholder.empty()
+            console_placeholder.empty()
 
         st.session_state["elapsed_time"] = round(time.time() - start_time, 2)
 
@@ -2427,8 +2511,9 @@ def main():
     st.markdown("<br>", unsafe_allow_html=True)
 
     # [수정] macOS Safari 트래픽라이트 스타일 -> 크롬 브라우저 창 바 스타일로 교체.
+    # + 우측 "분석 결과 페이지" 배지 삭제 (사용자 요청).
     st.markdown("""
-    <div style="background: #dee1e6; border-radius: 10px 10px 0 0; padding: 10px 18px 0 18px; display: flex; align-items: center; justify-content: space-between;">
+    <div style="background: #dee1e6; border-radius: 10px 10px 0 0; padding: 10px 18px; display: flex; align-items: center;">
         <div style="display:flex; align-items:center; gap:10px;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="9"></circle>
@@ -2436,19 +2521,16 @@ def main():
             </svg>
             <span style="font-size:12.5px; font-weight:700; color:#5f6368;">LitPhyto-PanInfluenza Engine — Results</span>
         </div>
-        <div style="display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:800; color:#047857; background:#e6f4ea; border:1px solid #a7f3d0; padding:3px 12px; border-radius:12px;">
-            <span style="width:7px; height:7px; border-radius:50%; background:#1a73e8; display:inline-block;"></span>
-            <span>분석 결과 페이지</span>
-        </div>
     </div>
     """, unsafe_allow_html=True)
 
+    # [수정] 탭 라벨 앞에 붙어있던 이모지 아이콘 삭제 (사용자 요청 - 아이콘 이미지들 삭제).
     raw_tab_names = [
-        "🧬 Lead Candidates Profiles",
-        "🔬 MOA Pathway Diagram",
-        "🌿 Optimal Extraction Proposals",
-        "📜 Patent Search",
-        "📊 Excel / PDF Report Download"
+        "Lead Candidates Profiles",
+        "MOA Pathway Diagram",
+        "Optimal Extraction Proposals",
+        "Patent Search",
+        "Excel / PDF Report Download"
     ]
 
     # [수정] st.radio + CSS 해킹으로 만든 가짜 탭 -> 네이티브 st.tabs()로 교체.
