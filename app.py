@@ -562,21 +562,6 @@ def search_patents_via_kipris(compound_name: str, query_resource: str, api_key: 
     import xml.etree.ElementTree as ET
 
     clean_name = extract_english_compound_name(compound_name) or compound_name
-    query = f"{clean_name} 항바이러스"
-
-    params = {
-        "word": query,
-        "ServiceKey": api_key,
-        "numOfRows": "5",
-        "pageNo": "1",
-    }
-    resp = _requests.get(
-        "https://plus.kipris.or.kr/kipo-api/kipi/patUtiModInfoSearchSevice/getWordSearch",
-        params=params, timeout=15
-    )
-    resp.raise_for_status()
-
-    root = ET.fromstring(resp.text)
 
     def _find_text(elem, *candidates):
         for tag in candidates:
@@ -585,28 +570,53 @@ def search_patents_via_kipris(compound_name: str, query_resource: str, api_key: 
                 return found.text.strip()
         return ""
 
-    items = root.findall(".//item")
-    results = []
-    for item in items[:5]:
-        title = _find_text(item, "inventionTitle", "articleTitle", "title")
-        app_num = _find_text(item, "applicationNumber", "applicationnumber")
-        applicant = _find_text(item, "applicantName", "applicant")
-        app_date = _find_text(item, "applicationDate", "applicationdate")
+    def _run_query(word_query):
+        params = {
+            "word": word_query,
+            "ServiceKey": api_key,
+            "numOfRows": "5",
+            "pageNo": "1",
+        }
+        resp = _requests.get(
+            "https://plus.kipris.or.kr/kipo-api/kipi/patUtiModInfoSearchSevice/getWordSearch",
+            params=params, timeout=15
+        )
+        resp.raise_for_status()
+        root = ET.fromstring(resp.text)
+        items = root.findall(".//item")
+        out = []
+        for item in items[:5]:
+            title = _find_text(item, "inventionTitle", "articleTitle", "title")
+            app_num = _find_text(item, "applicationNumber", "applicationnumber")
+            applicant = _find_text(item, "applicantName", "applicant")
+            app_date = _find_text(item, "applicationDate", "applicationdate")
+            if not title or not app_num:
+                continue
+            out.append({
+                "patent_id": app_num,
+                "title": title,
+                "applicant": applicant or "정보 없음",
+                "year": app_date[:4] if app_date else "N/A",
+                "source_db": "KIPRIS Plus (실제 검색됨)",
+                "url": f"http://www.kipris.or.kr/khome/search/search_word_result.jsp?searchWord={urllib.parse.quote(app_num)}",
+                "summary": f"KIPRIS Plus Open API에서 실제 검색된 출원 데이터. 출원번호 {app_num}, 출원일 {app_date or 'N/A'}.",
+                "verified": True,
+            })
+        return out
 
-        if not title or not app_num:
+    # [버그 수정] 원래는 "{화합물명} 항바이러스"라는 단일 쿼리(AND 조건)만 써서,
+    # 실제 관련 특허가 있어도 "항바이러스"라는 정확한 단어가 명세서에 없으면
+    # (한국 특허는 "바이러스 억제", "인플루엔자 저해" 등 다른 표현을 쓰는 경우가
+    # 많음) 항상 0건이 나오는 구조적 문제가 있었음. 구체적 -> 일반적 순으로
+    # 여러 쿼리를 순차 시도해서, 첫 번째로 실제 결과가 나오는 쿼리를 채택함.
+    for q in (f"{clean_name} 항바이러스", f"{clean_name} 바이러스", clean_name):
+        try:
+            results = _run_query(q)
+            if results:
+                return results
+        except Exception:
             continue
-
-        results.append({
-            "patent_id": app_num,
-            "title": title,
-            "applicant": applicant or "정보 없음",
-            "year": app_date[:4] if app_date else "N/A",
-            "source_db": "KIPRIS Plus (실제 검색됨)",
-            "url": f"http://www.kipris.or.kr/khome/search/search_word_result.jsp?searchWord={urllib.parse.quote(app_num)}",
-            "summary": f"KIPRIS Plus Open API에서 실제 검색된 출원 데이터. 출원번호 {app_num}, 출원일 {app_date or 'N/A'}.",
-            "verified": True,
-        })
-    return results
+    return []
 
 
 def search_patents_via_uspto_odp(compound_name: str, query_resource: str, api_key: str) -> list:
@@ -623,60 +633,74 @@ def search_patents_via_uspto_odp(compound_name: str, query_resource: str, api_ke
     import urllib.parse
 
     clean_name = extract_english_compound_name(compound_name) or compound_name
-    query = f"{clean_name} antiviral influenza"
 
-    headers = {"X-API-KEY": api_key, "Accept": "application/json"}
-    params = {"q": query, "limit": 5}
+    def _run_query(q):
+        headers = {"X-API-KEY": api_key, "Accept": "application/json"}
+        params = {"q": q, "limit": 5}
+        resp = _requests.get(
+            "https://api.uspto.gov/api/v1/patent/applications/search",
+            headers=headers, params=params, timeout=15
+        )
+        resp.raise_for_status()
+        data = resp.json()
 
-    resp = _requests.get(
-        "https://api.uspto.gov/api/v1/patent/applications/search",
-        headers=headers, params=params, timeout=15
-    )
-    resp.raise_for_status()
-    data = resp.json()
+        # ODP 응답 스키마가 공개 문서에 명확히 없어서, 최상위 배열/제목/번호/날짜/
+        # 출원인 필드를 여러 후보 키로 방어적으로 탐색함. 못 찾으면 빈 리스트 반환
+        # (가짜 데이터로 채우지 않음 - 차라리 결과 없음이 낫다는 판단).
+        bag = None
+        for key in ("patentFileWrapperDataBag", "results", "patents", "applications"):
+            if isinstance(data, dict) and key in data and isinstance(data[key], list):
+                bag = data[key]
+                break
+        if bag is None:
+            return []
 
-    # ODP 응답 스키마가 공개 문서에 명확히 없어서, 최상위 배열/제목/번호/날짜/
-    # 출원인 필드를 여러 후보 키로 방어적으로 탐색함. 못 찾으면 빈 리스트 반환
-    # (가짜 데이터로 채우지 않음 - 차라리 결과 없음이 낫다는 판단).
-    bag = None
-    for key in ("patentFileWrapperDataBag", "results", "patents", "applications"):
-        if isinstance(data, dict) and key in data and isinstance(data[key], list):
-            bag = data[key]
-            break
-    if bag is None:
-        return []
+        out = []
+        for item in bag[:5]:
+            meta = item.get("applicationMetaData", item) if isinstance(item, dict) else {}
+            title = meta.get("inventionTitle") or item.get("inventionTitle") or ""
+            app_num = meta.get("applicationNumberText") or item.get("applicationNumberText") or ""
+            filing_date = meta.get("filingDate") or item.get("filingDate") or ""
+            applicant = ""
+            applicants = meta.get("applicantBag") or meta.get("firstApplicantName")
+            if isinstance(applicants, list) and applicants:
+                applicant = applicants[0].get("applicantNameText", "") if isinstance(applicants[0], dict) else str(applicants[0])
+            elif isinstance(applicants, str):
+                applicant = applicants
 
-    results = []
-    for item in bag[:5]:
-        meta = item.get("applicationMetaData", item) if isinstance(item, dict) else {}
-        title = meta.get("inventionTitle") or item.get("inventionTitle") or ""
-        app_num = meta.get("applicationNumberText") or item.get("applicationNumberText") or ""
-        filing_date = meta.get("filingDate") or item.get("filingDate") or ""
-        applicant = ""
-        applicants = meta.get("applicantBag") or meta.get("firstApplicantName")
-        if isinstance(applicants, list) and applicants:
-            applicant = applicants[0].get("applicantNameText", "") if isinstance(applicants[0], dict) else str(applicants[0])
-        elif isinstance(applicants, str):
-            applicant = applicants
+            if not title or not app_num:
+                continue
 
-        if not title or not app_num:
+            # 같은 레코드에서 제목과 출원번호를 같이 가져와서 URL을 만들기 때문에
+            # 제목-링크 불일치가 구조적으로 발생할 수 없음.
+            gp_url = f"https://patents.google.com/patent/US{app_num.replace('/', '').replace('-', '')}A1/en"
+
+            out.append({
+                "patent_id": app_num,
+                "title": title,
+                "applicant": applicant or "정보 없음",
+                "year": filing_date[:4] if filing_date else "N/A",
+                "source_db": "USPTO ODP (실제 검색됨)",
+                "url": gp_url,
+                "summary": f"USPTO Open Data Portal에서 실제 검색된 출원 데이터. 출원번호 {app_num}, 출원일 {filing_date or 'N/A'}.",
+                "verified": True,
+            })
+        return out
+
+    # [버그 수정] 원래는 "{화합물명} antiviral influenza"라는 단일 쿼리(3단어
+    # AND 조건)만 써서, 이 3개 단어가 명세서에 전부 정확히 들어있는 특허만
+    # 찾을 수 있었음 - 실제로는 화합물 자체를 다루는 특허가 있어도 "antiviral"
+    # 이나 "influenza"라는 정확한 단어가 없으면 항상 0건이었음. 구체적 ->
+    # 일반적 순으로 여러 쿼리를 순차 시도해서, 첫 번째로 실제 결과가 나오는
+    # 쿼리를 채택함.
+    for q in (f"{clean_name} antiviral influenza", f"{clean_name} antiviral", clean_name):
+        try:
+            results = _run_query(q)
+            if results:
+                return results
+        except Exception:
             continue
-
-        # 같은 레코드에서 제목과 출원번호를 같이 가져와서 URL을 만들기 때문에
-        # 제목-링크 불일치가 구조적으로 발생할 수 없음.
-        gp_url = f"https://patents.google.com/patent/US{app_num.replace('/', '').replace('-', '')}A1/en"
-
-        results.append({
-            "patent_id": app_num,
-            "title": title,
-            "applicant": applicant or "정보 없음",
-            "year": filing_date[:4] if filing_date else "N/A",
-            "source_db": "USPTO ODP (실제 검색됨)",
-            "url": gp_url,
-            "summary": f"USPTO Open Data Portal에서 실제 검색된 출원 데이터. 출원번호 {app_num}, 출원일 {filing_date or 'N/A'}.",
-            "verified": True,
-        })
-    return results
+    return []
 
 
 def get_patent_database_urls(compound_name: str) -> dict:
