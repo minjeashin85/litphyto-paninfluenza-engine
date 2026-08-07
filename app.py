@@ -2794,15 +2794,26 @@ def render_login_page(hallym_b64: str, nibr_b64: str, milab_b64: str):
         box-shadow: 0 4px 16px rgba(79,70,229,0.3) !important;
     }
     div[data-testid="stFormSubmitButton"] button:hover { filter: brightness(1.08); }
+    .login_desc {
+        max-width: 480px; margin: 0 auto 26px auto; text-align: center;
+        font-size: 12px; color: #475569; line-height: 1.7;
+        background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+        padding: 14px 18px;
+    }
     </style>
     <div class="login_card_wrap">
         <div class="login_orbit">
             <div class="login_orbit_ring r1"></div>
             <div class="login_orbit_ring r2"></div>
-            <div class="login_orbit_core">🔮</div>
+            <div class="login_orbit_core"></div>
         </div>
         <div class="login_title">LitPhyto-PanInfluenza Engine</div>
         <div class="login_subtitle">AI-Driven Plant Species Binomial Profile Twin &amp; Antiviral MOA Predictor</div>
+        <div class="login_desc">
+            식물 학명을 입력하면 문헌·화합물 데이터베이스를 기반으로 항인플루엔자
+            유효성분을 예측하고, 작용기전(MOA)·최적 추출법·부위별 함유 비율·관련
+            특허·논문 근거까지 한 번에 정리해서 보여주는 AI 리서치 지원 도구입니다.
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
