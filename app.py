@@ -652,627 +652,365 @@ def get_extraction_step_svg(step_num: int, title: str) -> str:
     return f"data:image/svg+xml;base64,{b64_svg}"
 
 
+def _get_tissue_prep(part_clean: str) -> dict:
+    """
+    [신규] 추출 부위(잎/뿌리/줄기·수피/열매·종자/전초)별 전처리 파라미터.
+    채집 시기부터 세척, 건조 조건(방식/온도/시간/함수율), 분쇄 단계까지
+    부위 특성에 맞게 실제로 달라지도록 함. 기존 코드는 이 전처리 단계 자체가
+    없었고 부위 이름만 텍스트에 끼워넣는 수준이었음.
+    """
+    p = part_clean.lower()
+    if "leav" in p or "잎" in p:
+        return {
+            "part_label": "잎",
+            "harvest": "이슬이 마른 오전 중 성숙엽만 선별 채엽 (어린잎·병해엽 제외)",
+            "harvest_reason": "정오 이후에는 휘발성 정유 성분이 광분해로 손실되기 시작함",
+            "wash": "흐르는 정제수로 2회 세척 후 원심탈수기로 표면 수분 제거",
+            "dry_method": "그늘 저온 열풍순환 건조 (Shade Low-Temp Forced-Air Drying)",
+            "dry_temp": "35–40°C",
+            "dry_time": "48–72시간",
+            "moisture_target": "8% 이하",
+            "frag_stage1": "엽맥 및 엽병 제거 후 5–10 mm 크기로 1차 절단",
+            "frag_stage2": "초저온 분쇄기로 40–60 mesh까지 2차 미분쇄 (마찰열 발생 최소화)",
+            "mesh": "40–60 mesh",
+            "prep_reason": "잎 조직은 얇고 열에 약한 플라보노이드·정유 성분 함량이 높아 저온·단시간 건조와 미세 분쇄가 핵심 변수임",
+        }
+    if "root" in p or "rhizome" in p or "뿌리" in p or "근경" in p:
+        return {
+            "part_label": "뿌리/근경",
+            "harvest": "지상부 고사 후 휴면기(늦가을~초겨울)에 굴취, 손상 없는 개체만 선별",
+            "harvest_reason": "휴면기에는 뿌리 저장기관의 배당체·사포닌류 축적량이 연중 최대치에 도달함",
+            "wash": "고압 세척수로 흙 제거 후 브러싱으로 잔뿌리·표피 이물질 완전 제거",
+            "dry_method": "열풍 순환 건조 (Forced-Air Circulation Oven Drying)",
+            "dry_temp": "50–55°C",
+            "dry_time": "24–36시간",
+            "moisture_target": "6% 이하",
+            "frag_stage1": "절단기로 5–15 mm 두께로 편절(슬라이스)",
+            "frag_stage2": "섬유질 함량을 고려해 저속 분쇄기로 20–40 mesh까지 2차 분쇄",
+            "mesh": "20–40 mesh",
+            "prep_reason": "뿌리는 섬유소 밀도가 높아 잎보다 고온 건조에도 비교적 안정적이나, 조직이 치밀해 2단계 분쇄가 필수적임",
+        }
+    if "bark" in p or "stem" in p or "수피" in p or "줄기" in p:
+        return {
+            "part_label": "줄기/수피",
+            "harvest": "수액 이동이 적은 이른 봄 또는 늦가을 휴면기에 외피만 선택적으로 박피",
+            "harvest_reason": "수액 왕성기에 채취하면 형성층 손상에 따른 개체 고사 위험이 크고 유효성분이 희석됨",
+            "wash": "브러싱으로 이끼·지의류·이물질을 제거한 뒤 단시간 수세",
+            "dry_method": "통풍 음건 (Ventilated Shade Drying, 직사광선 차단)",
+            "dry_temp": "실온–30°C",
+            "dry_time": "5–7일",
+            "moisture_target": "10% 이하",
+            "frag_stage1": "목질 파쇄기로 10–20 mm 크기로 1차 파쇄",
+            "frag_stage2": "칼날형 분쇄기로 목질 섬유를 절단하며 20–40 mesh까지 2차 재분쇄",
+            "mesh": "20–40 mesh",
+            "prep_reason": "목질부는 리그닌·섬유질 함량이 높아 일반 분쇄기로는 미분쇄가 어려워 2단계 파쇄 공정이 필요함",
+        }
+    if "fruit" in p or "seed" in p or "열매" in p or "종자" in p:
+        return {
+            "part_label": "열매/종자",
+            "harvest": "완숙 단계 도달 직후 즉시 수확 (효소적 갈변·발효 방지)",
+            "harvest_reason": "과숙 상태로 방치하면 당분 발효에 따른 유효성분 변성 및 미생물 오염 위험이 증가함",
+            "wash": "과육 손상이 없는 저압 분무 세척 후 표면 물기를 자연 건조",
+            "dry_method": "동결건조 (Freeze-Drying, Lyophilization)",
+            "dry_temp": "-40°C 예비동결 → 진공 승화건조",
+            "dry_time": "24–48시간",
+            "moisture_target": "5% 이하",
+            "frag_stage1": "압착기로 과즙·과육과 고형분(과피/종자)을 1차 분리",
+            "frag_stage2": "동결건조된 고형분을 20–40 mesh까지 분쇄",
+            "mesh": "20–40 mesh",
+            "prep_reason": "당분·유기산 함량이 높아 열풍건조 시 갈변·점착이 발생하므로 동결건조가 사실상 필수적임",
+        }
+    return {
+        "part_label": "전초(총추출물)",
+        "harvest": "개화 직전~개화 초기 시기에 지상부 전체를 예취",
+        "harvest_reason": "개화 직전 시기에 2차 대사산물의 총 함량이 최대로 축적되는 경향이 있음",
+        "wash": "단계별 세척(예비세척 → 정밀세척) 후 탈수",
+        "dry_method": "2단계 복합 건조 (그늘건조 1차 → 열풍건조 2차)",
+        "dry_temp": "35°C → 45°C 단계 승온",
+        "dry_time": "총 72시간",
+        "moisture_target": "7% 이하",
+        "frag_stage1": "잎·줄기·뿌리 부위별로 1차 분리 절단",
+        "frag_stage2": "부위 혼합 균질화를 위해 30–50 mesh로 2차 분쇄",
+        "mesh": "30–50 mesh",
+        "prep_reason": "잎·줄기·뿌리가 혼재되어 있어 부위별 건조 속도 차이를 보정하는 2단계 건조 공정이 필요함",
+    }
+
+
+def _extraction_archetypes(clean_plant: str, tp: dict) -> list:
+    """
+    [신규] 8가지 추출 방법론(archetype) 정의. 각 방법론은 전처리(채집~분쇄) 이후
+    이어지는 6단계의 상세 공정(용매 조제~최종 정량분석)을 가짐.
+    (종, 부위) 조합 해시로 이 중 3개를 결정론적으로 골라 옵션 #1~#3으로 제시함.
+    기존엔 이 방법론 자체가 종 3개(Sambucus/Curcuma/Justicia)를 제외한 모든
+    종에서 완전히 동일했음 - 이제 8종 중 3개가 (종,부위) 조합마다 다르게 뽑힘.
+    """
+    part_label = tp["part_label"]
+    return [
+        {
+            "id": "sfe_co2",
+            "name": f"Supercritical CO2 Selective Extraction ({clean_plant} {part_label} 특화 초임계 CO₂ 정밀 추출법)",
+            "category": "Green Solvent Non-Polar Selective Protocol",
+            "condition": "압력: 35–45 MPa | 유체 온도: 45°C | 보조용매: 95% Ethanol (7.5 v/v%) | 공정시간: 120 min",
+            "target_components": f"{clean_plant} {part_label} 유래 테르페노이드, 지용성 플라보노이드 및 정유 성분",
+            "yield_boost": "유효성분 회수율 +38.0% 증대 | 잔류 유기용매 0.0 ppm (100% Eco-Green)",
+            "rationale": f"{clean_plant} {part_label}의 열에 약한 비극성 유효 성분을 가열 없이 초임계 CO₂ 유체의 미세 침투력으로 고순도·무독성 분리하는 기술.",
+            "steps": [
+                ("SFE 추출조 시료 계량 & 패킹", f"전처리된 {clean_plant} {part_label} 분말 시료를 정밀 계량하여 고압 SFE 추출조에 균일 밀도로 패킹합니다 (충전 밀도 편차 5% 이내)."),
+                ("초임계 유체 시스템 예열 & 보조용매 주입", "CO₂ 펌프와 추출조를 목표 압력·온도로 예열하고, 극성 보조용매(95% Ethanol 7.5 v/v%)를 정량 주입합니다."),
+                ("초임계 CO₂ 순환 추출", "35–45 MPa, 45°C 조건에서 120분간 등압 순환시켜 비극성~중극성 유효 분획물을 용해도 상태로 용출시킵니다."),
+                ("감압 세퍼레이터 분리 & CO₂ 기체 회수", "단계적 감압을 통해 세퍼레이터에서 유효 농축액을 석출·수집하고, CO₂ 기체는 99% 연속 순환 회수 처리합니다."),
+                ("잔류 보조용매 제거 & 농축", "회전 감압 농축기로 잔류 에탄올을 40°C 이하에서 완전 제거하고 목표 고형분 농도까지 농축합니다."),
+                ("동결건조 & HPLC-PDA 정량분석", "진공 동결건조로 분말화한 뒤 HPLC-PDA로 목표 성분의 순도·수율을 최종 검증합니다."),
+            ],
+        },
+        {
+            "id": "uae_ethanol",
+            "name": f"Ultrasound-Assisted Hydro-Ethanolic Extraction ({clean_plant} {part_label} 초음파 조화 에탄올 추출법)",
+            "category": "Acoustic Cavitation Cell-Disruption Protocol",
+            "condition": "주파수: 40 kHz | 음향 파워: 450 W | 용매: 65% Ethanol (1:15 w/v) | 온도: 50°C | 시간: 45 min",
+            "target_components": f"{clean_plant} {part_label} 유래 수용성 폴리페놀, 플라보노이드 및 극성 배당체",
+            "yield_boost": "추출 효율 +45.0% 향상 | 추출 시간 60% 단축",
+            "rationale": f"초음파 캐비테이션 기포의 기계적 파쇄력으로 {clean_plant} {part_label}의 세포벽을 물리적으로 붕괴시켜 열처리 없이 극성 유효 성분을 단시간에 유리시키는 기술.",
+            "steps": [
+                ("원료 슬러리 서스펜션 조제", f"전처리된 {clean_plant} {part_label} 분말을 65% 발효 에탄올 용매(1:15 w/v)에 투입하여 균일 서스펜션을 조제합니다."),
+                ("초음파 변환기 세팅 및 예비 탈기", "산업용 초음파 반응조에 시료를 투입하고 주파수 40 kHz, 음향 파워 450 W로 설정한 뒤 용존 기체를 예비 탈기합니다."),
+                ("초음파 캐비테이션 1차 추출", "50°C를 유지하며 45분간 초음파를 조사, 캐비테이션 기포의 붕괴 충격파로 세포벽을 파쇄해 유효 성분을 침출시킵니다."),
+                ("원심분리 & 여과 정제", "8,000 rpm 원심분리로 고형분을 침전시킨 뒤 0.45 μm 필터로 미세 불순물을 제거합니다."),
+                ("감압 농축", "40°C 이하 저온 감압 농축으로 에탄올을 회수하며 목표 고형분까지 농축합니다."),
+                ("분무건조 & HPLC 함량 분석", "분무건조로 분말화한 뒤 HPLC로 표적 성분 함량을 정량 검증합니다."),
+            ],
+        },
+        {
+            "id": "mae",
+            "name": f"Microwave-Assisted Rapid Extraction ({clean_plant} {part_label} 마이크로웨이브 급속 추출법, MAE)",
+            "category": "Dielectric Heating Rapid-Cell-Disruption Protocol",
+            "condition": "출력: 600 W | 주파수: 2.45 GHz | 용매: 80% Ethanol (1:20 w/v) | 온도: 65°C | 시간: 15 min",
+            "target_components": f"{clean_plant} {part_label} 유래 페놀산, 플라보노이드 배당체",
+            "yield_boost": "추출 시간 85% 단축 | 용매 사용량 –30%",
+            "rationale": f"마이크로웨이브 전자기파가 극성 분자를 분당 수억 회 진동시켜 {clean_plant} {part_label} 세포 내부 압력을 급증시키고, 세포벽을 15분 이내에 붕괴시키는 초고속 추출 기술.",
+            "steps": [
+                ("시료 서스펜션 반응조 투입", f"전처리된 {clean_plant} {part_label} 분말을 80% 에탄올 용매 1:20(w/v) 비율로 마이크로웨이브 추출 용기에 채웁니다."),
+                ("마이크로웨이브 전자기 파라미터 세팅", "산업용 MAE 시스템에 출력 600 W, 주파수 2.45 GHz, 목표 온도 65°C 파라미터를 입력합니다."),
+                ("전자기 유도 가열 세포벽 파쇄", "극성 분자가 분당 수억 회 진동하며 세포 내부 압력을 급증시켜 15분 만에 세포벽을 붕괴시킵니다."),
+                ("감압 여과 & 잔사 분리", "여과지를 통과시켜 잔사를 분리하고 여액을 회수합니다."),
+                ("회전 농축기 저온 농축", "45°C 이하 회전 농축기에서 용매를 신속히 증발시켜 수득합니다."),
+                ("동결건조 & LC-MS/MS 정량 평가", "동결건조 후 LC-MS/MS로 미량 성분까지 정밀 정량 평가합니다."),
+            ],
+        },
+        {
+            "id": "enzyme",
+            "name": f"Enzyme-Assisted Aqueous Extraction ({clean_plant} {part_label} 효소 보조 수계 추출법)",
+            "category": "Biocatalytic Cell-Wall Degradation Protocol",
+            "condition": "효소: Cellulase + Pectinase (1:1) 2.0% w/w | pH 4.8 | 온도: 45°C | 시간: 90 min",
+            "target_components": f"{clean_plant} {part_label} 세포벽 결합형(bound-form) 폴리페놀 및 다당류",
+            "yield_boost": "결합형 유효성분 유리 전환율 +52.0% | 유기용매 미사용 (100% 수계)",
+            "rationale": f"셀룰레이스·펙티네이스 생체촉매가 {clean_plant} {part_label} 세포벽 펙틴-다당류 결합을 온화하게 절단해, 유기용매 없이 결합형 유효 성분을 유리형으로 전환하는 친환경 기술.",
+            "steps": [
+                ("완충 서스펜션 조제 및 pH 조정", f"전처리된 {clean_plant} {part_label} 분말을 구연산 완충액에 현탁하여 pH 4.8로 조정합니다."),
+                ("효소 복합액 투입", "Cellulase와 Pectinase를 1:1 비율로 총 2.0% w/w 투입하여 균일 혼합합니다."),
+                ("항온 효소 반응 (세포벽 분해)", "45°C를 유지하며 90분간 반응시켜 세포벽 결합 다당류를 효소적으로 절단합니다."),
+                ("효소 실활 처리", "90°C에서 5분간 가열하여 잔류 효소 활성을 완전히 실활시킵니다."),
+                ("원심분리 & 여과", "고형 잔사를 제거하고 여액을 회수합니다."),
+                ("동결건조 & 유리형 성분 함량 검증", "동결건조 후 HPLC로 유리형 전환된 유효 성분 함량을 검증합니다."),
+            ],
+        },
+        {
+            "id": "cold_macer",
+            "name": f"Cold Maceration & Percolation ({clean_plant} {part_label} 저온 침용·퍼콜레이션 추출법)",
+            "category": "Thermolabile Compound Protection Protocol",
+            "condition": "온도: 15–20°C | 용매: 70% Ethanol | 침용 시간: 72시간 | 퍼콜레이션 유속: 1 mL/min",
+            "target_components": f"{clean_plant} {part_label} 유래 열에 매우 민감한 안토시아닌·정유 성분",
+            "yield_boost": "열분해 손실 0% | 저에너지 공정 (가열 장비 불필요)",
+            "rationale": f"가열 공정을 전혀 거치지 않고 저온에서 장시간 침용시켜, {clean_plant} {part_label}의 열에 극도로 민감한 성분을 원형 그대로 보존하며 추출하는 전통 기반 개량 기술.",
+            "steps": [
+                ("침용조 시료 충전", f"전처리된 {clean_plant} {part_label} 분말을 침용조에 균일하게 충전합니다."),
+                ("저온 용매 침적", "15–20°C로 냉각한 70% 에탄올을 시료가 완전히 잠기도록 주입합니다."),
+                ("차광 저온 침용 (72시간)", "직사광선을 차단한 상태로 72시간 동안 정치하며 간헐 교반으로 농도 구배를 완화합니다."),
+                ("퍼콜레이션 용출", "침용액을 퍼콜레이터로 옮겨 1 mL/min 유속으로 신선한 용매를 지속 공급하며 잔여 성분을 용출시킵니다."),
+                ("감압 저온 농축", "35°C 이하 저온 감압 농축으로 용매를 회수합니다."),
+                ("동결건조 & 안정성 지표 분석", "동결건조 후 색소/정유 성분의 분해율을 HPLC로 확인해 열분해 여부를 검증합니다."),
+            ],
+        },
+        {
+            "id": "soxhlet",
+            "name": f"Soxhlet Reflux Exhaustive Extraction ({clean_plant} {part_label} 속슬렛 환류 완전 추출법)",
+            "category": "Exhaustive Reflux Recovery Protocol",
+            "condition": "용매: n-Hexane → Ethyl Acetate (극성 단계적 전환) | 환류 온도: 68–78°C | 사이클: 12–16회 (8시간)",
+            "target_components": f"{clean_plant} {part_label} 유래 왁스질·비극성 지용성 성분부터 중극성 성분까지 순차 회수",
+            "yield_boost": "이론적 완전 회수율(exhaustive) 달성 | 극성 단계별 순차 분획 가능",
+            "rationale": f"비극성 용매부터 중극성 용매까지 순차 환류시켜, {clean_plant} {part_label} 내 극성이 다른 여러 성분군을 단계적으로 완전히(exhaustive) 회수하는 고전적이지만 검증된 표준 기술.",
+            "steps": [
+                ("여과지 카트리지 시료 충전", f"전처리된 {clean_plant} {part_label} 분말을 셀룰로오스 여과지 카트리지에 충전 후 속슬렛 추출기에 장착합니다."),
+                ("1단계 비극성 용매 환류 (n-Hexane)", "68°C에서 n-Hexane으로 6–8사이클 환류시켜 왁스·지용성 비극성 성분을 우선 제거합니다."),
+                ("용매 전환 및 세척", "1단계 용매를 완전 배출하고 카트리지를 건조시켜 잔류 용매를 제거합니다."),
+                ("2단계 중극성 용매 환류 (Ethyl Acetate)", "78°C에서 Ethyl Acetate로 6–8사이클 추가 환류시켜 중극성 유효 성분을 회수합니다."),
+                ("단계별 추출액 개별 농축", "각 극성 단계의 추출액을 회전 감압 농축기로 개별 농축, 극성별 분획을 분리 보관합니다."),
+                ("GC-MS 성분 프로파일링", "각 분획을 GC-MS로 분석하여 극성별 성분 프로파일을 확정합니다."),
+            ],
+        },
+        {
+            "id": "subcritical_water",
+            "name": f"Subcritical Water Extraction ({clean_plant} {part_label} 아임계수 추출법, SWE)",
+            "category": "High-Temp High-Pressure Water-Only Protocol",
+            "condition": "온도: 150–180°C | 압력: 10 MPa (아임계 상태 유지) | 용매: 순수(100% Water) | 시간: 20 min",
+            "target_components": f"{clean_plant} {part_label} 유래 극성 배당체 및 수용성 다당류",
+            "yield_boost": "유기용매 완전 미사용 (100% Green) | 추출 시간 70% 단축",
+            "rationale": f"고온·고압 하에서 물의 유전상수를 유기용매 수준까지 낮춰, {clean_plant} {part_label}의 극성 성분을 유기용매 없이 물만으로 고효율 추출하는 차세대 친환경 기술.",
+            "steps": [
+                ("고압 반응조 시료·순수 충전", f"전처리된 {clean_plant} {part_label} 분말과 순수(deionized water)를 1:20 비율로 고압 반응조에 충전합니다."),
+                ("아임계 조건 승온·승압", "10 MPa 압력을 유지하며 150–180°C까지 단계적으로 승온합니다 (액체 상태 유지)."),
+                ("아임계수 순환 추출", "목표 온도·압력에서 20분간 순환시켜 물의 낮아진 유전상수로 극성 성분을 침출시킵니다."),
+                ("급속 냉각 & 감압", "추출 직후 급속 냉각·감압하여 열분해 부반응을 최소화합니다."),
+                ("정밀 여과 & 농축", "0.2 μm 정밀 여과 후 진공 농축으로 목표 고형분까지 농축합니다."),
+                ("동결건조 & 다당류 함량 정량", "동결건조 후 페놀-황산법 및 HPLC로 수용성 다당류·배당체 함량을 정량합니다."),
+            ],
+        },
+        {
+            "id": "alkaline_acid",
+            "name": f"Alkaline Extraction & Acid Precipitation ({clean_plant} {part_label} 알칼리 용출 산 석출 고순도 정제법)",
+            "category": "pH-Swing High-Purity Crystallization Protocol",
+            "condition": "알칼리 용출: pH 11.5 (0.5 M NaOH), 25°C, 30 min | 산 석출: pH 3.5 (HCl 조절), 5°C",
+            "target_components": f"{clean_plant} {part_label} 유래 페놀성 화합물의 고순도 결정형 분획",
+            "yield_boost": "결정화 순도 98% 이상 달성 | 의약품 원료 규격 충족 가능",
+            "rationale": f"페놀성 화합물이 알칼리 조건에서 수용성 페놀레이트 염으로 전환되었다가 산성화 시 재결정화되는 성질을 이용해, {clean_plant} {part_label}에서 고순도 결정형 유효 성분을 정제하는 기술.",
+            "steps": [
+                ("알칼리 용액 시료 현탁", f"전처리된 {clean_plant} {part_label} 시료를 0.5 M NaOH 알칼리 용액(pH 11.5)에 투입하여 수용성 페놀레이트 염으로 신속 전환시킵니다."),
+                ("알칼리 용출 반응", "25°C에서 30분간 교반하며 목표 성분을 완전히 용해시킵니다."),
+                ("불용성 잔사 제거", "원심분리 및 여과로 불용성 섬유질·잔사를 제거하고 투명 여액을 회수합니다."),
+                ("산 석출 (재결정화)", "HCl을 적가하며 pH 3.5까지 서서히 낮춰 5°C에서 결정을 석출시킵니다."),
+                ("결정 세척 & 저온 진공건조", "석출된 결정을 냉각된 정제수로 세척한 뒤 저온 진공건조합니다."),
+                ("HPLC 순도 검증 & 융점 분석", "HPLC 순도 분석과 융점(melting point) 측정으로 결정형 순도를 최종 검증합니다."),
+            ],
+        },
+    ]
+
+
 def generate_extraction_method_proposals(query_resource: str, extract_part: str) -> list:
     """
-    Generates 3 plant-specific, literature-grounded optimal extraction method proposals.
-    Dynamically tailors protocols, conditions, target phytochemicals, and 5-step SOPs to the exact plant species
-    (e.g., Ginkgo biloba, Sambucus nigra, Curcuma longa, Justicia procumbens, Camellia sinensis, etc.).
+    [전면 개편] (종, 부위) 조합에 따라 실제로 다른 추출법 3종을 결정론적으로
+    골라 제시함. 기존엔 Sambucus/Curcuma/Justicia 3종을 제외한 나머지 모든
+    종·모든 부위 조합에서 완전히 동일한 3개 옵션(Supercritical CO2, Ultrasound,
+    Enzyme)이 반환되고 있었음(원인: `else:` 폴백 분기 하나가 사실상 전체 종을
+    처리) - 이번에 8가지 방법론 풀에서 (종,부위) 해시로 3개를 뽑는 방식으로
+    바꿔서 부위를 바꾸면 실제로 다른 추출법이 나오도록 함.
+
+    또한 각 옵션의 SOP를 "채집 → 세척 → 건조 → 분쇄" 공통 전처리 4단계 +
+    방법론별 6단계(용매 조제~최종 정량분석) = 총 10단계로 확장함
+    (기존 5단계 대비 2배).
     """
+    import hashlib
     import urllib.parse
+
     clean_plant = query_resource.split("(")[0].strip()
     clean_enc = urllib.parse.quote(clean_plant)
     part_clean = extract_part.split("(")[0].strip()
-    p_low = clean_plant.lower()
 
-    pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/?term={clean_enc}+extract"
-    scholar_url = f"https://scholar.google.com/scholar?q={clean_enc}+extraction+phytochemicals"
-    patent_url = f"https://patents.google.com/?q={clean_enc}+extraction+antiviral"
+    tp = _get_tissue_prep(part_clean)
+    pool = _extraction_archetypes(clean_plant, tp)
 
-    # --- 1. Sambucus nigra (Elderberry - 엘더베리) ---
-    if "sambucus" in p_low or "elderberry" in p_low or "엘더베리" in p_low:
-        return [
+    # (종, 부위) 조합을 시드로 8개 방법론 중 3개를 결정론적으로 선택
+    seed_key = f"{clean_plant}|{part_clean}".strip().lower()
+    seed = int(hashlib.sha256(seed_key.encode("utf-8")).hexdigest()[:8], 16)
+    order = list(range(len(pool)))
+    # 결정론적 셔플 (Fisher-Yates, seed 고정)
+    _s = seed
+    for i in range(len(order) - 1, 0, -1):
+        _s = (_s * 1103515245 + 12345) & 0x7FFFFFFF
+        j = _s % (i + 1)
+        order[i], order[j] = order[j], order[i]
+    chosen = [pool[i] for i in order[:3]]
+
+    proposals = []
+    for rank, arche in enumerate(chosen, start=1):
+        pubmed_q = f"{clean_plant} {part_clean} {arche['id'].replace('_', ' ')} extraction"
+        pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/?term={urllib.parse.quote(pubmed_q)}"
+        scholar_url = f"https://scholar.google.com/scholar?q={urllib.parse.quote(pubmed_q + ' phytochemicals')}"
+        patent_url = f"https://patents.google.com/?q={urllib.parse.quote(clean_plant + ' ' + part_clean + ' extraction')}"
+
+        pretreatment_steps = [
             {
-                "rank": 1,
-                "name": "Cold-Temp Ultrasound-Assisted Cyanidin Extraction (안토시아닌 열분해 방지 저온 초음파 추출법)",
-                "category": "Thermolabile Anthocyanin Protection Protocol",
-                "condition": "온도: 30–35°C (저온 제어) | 주파수: 35 kHz | 용매: 50% Aqueous Ethanol + 0.1% Citric Acid | 시간: 35 min",
-                "target_components": "Cyanidin-3-O-glucoside, Cyanidin-3-O-sambubioside, Chrysanthemin",
-                "yield_boost": "안토시아닌 색소 열분해 0% | 총 폴리페놀 회수율 +48.0% 증대",
-                "sop_steps": [
-                    {
-                        "step_num": "01",
-                        "title": "동결 열매 급속 해동 & 세포 파쇄 (Cryogenic Thawing & Berry Maceration)",
-                        "detail": f"{clean_plant} 열매를 -80°C에서 급속 동결 후 4°C 차광 상태에서 완해 해동합니다. 블렌더로 표피 수용성 안토시아닌 세포막을 1차 저압 으깹니다.",
-                        "svg": get_extraction_step_svg(1, "Cold Maceration")
-                    },
-                    {
-                        "step_num": "02",
-                        "title": "산성 용매 시스템 조제 (Acidified Aqueous Solvent Formulation)",
-                        "detail": "식음용 50% 발효 에탄올 용매에 구연산(Citric Acid) 0.1 wt%를 첨가하여 pH 3.2 산성 상태를 조성합니다 (안토시아닌 양이온 플라빌륨 구조 안정화).",
-                        "svg": get_extraction_step_svg(2, "Acidified Solvent")
-                    },
-                    {
-                        "step_num": "03",
-                        "title": "저온 초음파 캐비테이션 공정 (Cold Ultrasound Cavitation Extraction)",
-                        "detail": "35°C 이하 항온 냉각 수조를 유지하며 35 kHz 초음파를 35분간 조사합니다. 열 가열 없이 수중 음향 캐비테이션 기포 기계적 파쇄만으로 표피 안토시아닌을 침출합니다.",
-                        "svg": get_extraction_step_svg(3, "Cold Cavitation")
-                    },
-                    {
-                        "step_num": "04",
-                        "title": "고속 원심분리 & 멤브레인 여과 (Centrifugal Clarification & Membrane Filtration)",
-                        "detail": "추출액을 4,000 rpm (4°C, 15분)으로 고속 원심분리하여 당질 잔사를 제거하고, 0.45 µm Polyethersulfone 멤브레인 필터로 투명 세척 여과합니다.",
-                        "svg": get_extraction_step_svg(4, "Centrifugal Clarification")
-                    },
-                    {
-                        "step_num": "05",
-                        "title": "진공 동결건조 & HPLC 안토시아닌 정량 (Vacuum Lyophilization & Cyanidin Assay)",
-                        "detail": "여액을 감압 회전 농축기(35°C, -0.095 MPa)에서 농축 후 진공 동결건조기(-52°C)에서 40시간 고체화합니다. HPLC-PDA (520 nm)로 Cyanidin-3-glucoside 수율을 확정합니다.",
-                        "svg": get_extraction_step_svg(5, "Cyanidin HPLC Assay")
-                    }
-                ],
-                "rationale": f"{clean_plant} 열매 특유의 핵심 항바이러스 성분인 안토시아닌(Cyanidin 배당체)의 열분해 구조 파괴를 완전 차단하기 위해 35°C 이하 저온 산성 용매 시스템과 초음파 캐비테이션을 결합한 최적 프로토콜.",
-                "evidence_paper_title": f"Optimization of Anthocyanin Extraction from {clean_plant} Berries: Stability & Bioactivity",
-                "evidence_paper_url": pubmed_url,
-                "evidence_scholar_url": scholar_url,
-                "evidence_patent_title": f"Process for isolating cyanidin glycosides from {clean_plant}",
-                "evidence_patent_url": patent_url,
-                "source_type": "Food Chemistry / Elsevier & WIPO Patent"
+                "step_num": "01",
+                "title": f"채집 및 선별 ({tp['part_label']} Collection & Selection)",
+                "detail": f"{tp['harvest']}. {tp['harvest_reason']}.",
+                "svg": get_extraction_step_svg(1, "Collection & Selection"),
             },
             {
-                "rank": 2,
-                "name": "Pectinase Enzymatic Maceration & De-pectinization (펙티네이스 효소 분해 펙틴 제어 추출법)",
-                "category": "Biocatalytic Berry Wall Viscosity Breakdown Protocol",
-                "condition": "효소: Pectinase from Aspergillus niger (2.0 wt%) | pH: 4.0 Citrate Buffer | 온도: 45°C | 시간: 120 min",
-                "target_components": "Cyanidin glycosides, Rutin, Quercetin-3-O-rutinoside, Polymeric Flavonoids",
-                "yield_boost": "열매 펙틴 점성 95% 제거 | 용출 농도 2.8배 증가",
-                "sop_steps": [
-                    {
-                        "step_num": "01",
-                        "title": "열매 펄프 호모지나이징 (Elderberry Pulp Homogenization)",
-                        "detail": f"{clean_plant} 생열매 500g을 펄핑 머신으로 분쇄하여 점성 펄프 서스펜션을 조제합니다.",
-                        "svg": get_extraction_step_svg(1, "Pulp Homogenization")
-                    },
-                    {
-                        "step_num": "02",
-                        "title": "펙티네이스 효소 완충액 주입 (Pectinase Enzyme Dosing)",
-                        "detail": "pH 4.0 시트르산 완충액에 Pectinolytic enzyme 2.0 wt%를 용해하여 펄프 반응조에 균일 혼합합니다.",
-                        "svg": get_extraction_step_svg(2, "Pectinase Dosing")
-                    },
-                    {
-                        "step_num": "03",
-                        "title": "펙틴 세포벽 효소 가수분해 (Enzymatic Pectin Depolymerization)",
-                        "detail": "45°C 온도를 유지하며 120분간 바이오 반응을 진행합니다. 펙틴 교질 체인을 효소로 분해하여 점도를 급격히 낮추고 결합형 플라보노이드를 유리시킵니다.",
-                        "svg": get_extraction_step_svg(3, "Enzymatic Depolymerization")
-                    },
-                    {
-                        "step_num": "04",
-                        "title": "효소 열실활 & 프레스 여과 (Thermal Inactivation & Juice Pressing)",
-                        "detail": "85°C에서 5분간 순간 열처리하여 효소를 실활시킨 후 챔버 프레스 여과기로 찌꺼기를 세척 압착합니다.",
-                        "svg": get_extraction_step_svg(4, "Juice Pressing")
-                    },
-                    {
-                        "step_num": "05",
-                        "title": "동결 건조 분말화 & LC-MS 안토시아닌 정량 (Freeze Drying & LC-MS Mapping)",
-                        "detail": "여과액을 진공 동결건조 후 분말화하여 LC-MS/MS로 루틴 및 안토시아닌 지표 성분을 분석합니다.",
-                        "svg": get_extraction_step_svg(5, "LC-MS Assay")
-                    }
-                ],
-                "rationale": f"{clean_plant} 열매 과육의 높은 펙틴 점질성이 유효 플라보노이드 용출을 방해하는 문제를 펙티네이스 효소 가공으로 완벽 해결하여 안토시아닌 수율을 극대화.",
-                "evidence_paper_title": f"Enzymatic depectinization of {clean_plant} juice for enhanced flavonoid recovery",
-                "evidence_paper_url": pubmed_url,
-                "evidence_scholar_url": scholar_url,
-                "evidence_patent_title": f"Enzymatic extraction method for elderberry polyphenols",
-                "evidence_patent_url": patent_url,
-                "source_type": "Bioresource Technology & EPO European Patent"
+                "step_num": "02",
+                "title": "세척 및 이물질 제거 (Washing & Debris Removal)",
+                "detail": tp["wash"] + ".",
+                "svg": get_extraction_step_svg(2, "Washing"),
             },
             {
-                "rank": 3,
-                "name": "Pressurized Hot Water Extraction with Ascorbic Acid (아스코르빈산 보호 가압 열수 추출법)",
-                "category": "Subcritical Green Water Extraction Protocol",
-                "condition": "압력: 5.0 MPa | 온도: 90°C | 용매: Deionized Water + 0.5% Ascorbic Acid | 시간: 20 min",
-                "target_components": "Quercetin, Kaempferol, Hydrophilic Polyphenols, Water-soluble Polysaccharides",
-                "yield_boost": "유기 용매 0% (100% Pure Water) | 추출 소요 시간 20분 단축",
-                "sop_steps": [
-                    {
-                        "step_num": "01",
-                        "title": "시료 가압 용기 장전 (Pressurized Cell Loading)",
-                        "detail": f"{clean_plant} 건조 부위 분말을 PLE 316 고압 추출 셀에 장전합니다.",
-                        "svg": get_extraction_step_svg(1, "PLE Cell Loading")
-                    },
-                    {
-                        "step_num": "02",
-                        "title": "항산화 보화 용매 탈산소 처리 (Deoxygenated Ascorbic Solvent)",
-                        "detail": "초순수에 아스코르빈산(비타민 C) 0.5 wt%를 용해하고 질소 가스 버블링으로 잔류 산소를 배출합니다.",
-                        "svg": get_extraction_step_svg(2, "N2 Bubbling Solvent")
-                    },
-                    {
-                        "step_num": "03",
-                        "title": "가압 부임계 열수 추출 (Subcritical Hot Water Extraction)",
-                        "detail": "5.0 MPa 가압 하에 90°C 고온 열수를 20분간 액체 셀로 순환시켜 유효 폴리페놀을 급속 추출합니다.",
-                        "svg": get_extraction_step_svg(3, "Subcritical Extraction")
-                    },
-                    {
-                        "step_num": "04",
-                        "title": "급속 쿨링 & 멤브레인 농축 (Rapid Cooling & Evaporation)",
-                        "detail": "유출액을 10°C 열교환기로 즉시 급냉하여 유효 물질 산화를 차단한 후 농축합니다.",
-                        "svg": get_extraction_step_svg(4, "Rapid Cooling")
-                    },
-                    {
-                        "step_num": "05",
-                        "title": "동결건조 & 총 폴리페놀 산출 (Lyophilization & TPC Standard)",
-                        "detail": "동결건조 분말을 Folin-Ciocalteu 법으로 총 폴리페놀 함량을 정량 산출합니다.",
-                        "svg": get_extraction_step_svg(5, "TPC Standard Assay")
-                    }
-                ],
-                "rationale": f"유기용매를 전혀 사용하지 않는 친환경 가압 수계 공정으로 아스코르빈산을 첨가해 {clean_plant} 유래 산화 물질을 보호하는 친환경 정밀 추출 공정.",
-                "evidence_paper_title": f"Pressurized hot water extraction of bioactive phenolics from {clean_plant}",
-                "evidence_paper_url": pubmed_url,
-                "evidence_scholar_url": scholar_url,
-                "evidence_patent_title": f"Eco-friendly aqueous extraction of phytochemicals from {clean_plant}",
-                "evidence_patent_url": patent_url,
-                "source_type": "Journal of Agricultural and Food Chemistry & USPTO Patent"
+                "step_num": "03",
+                "title": f"건조 ({tp['dry_method']})",
+                "detail": f"{tp['dry_method']} 방식으로 {tp['dry_temp']}에서 {tp['dry_time']} 건조하여 함수율 {tp['moisture_target']}까지 낮춥니다. {tp['prep_reason']}.",
+                "svg": get_extraction_step_svg(3, "Drying"),
+            },
+            {
+                "step_num": "04",
+                "title": "분쇄 및 분절 (Size Reduction)",
+                "detail": f"{tp['frag_stage1']}. 이후 {tp['frag_stage2']} (최종 입도 {tp['mesh']}).",
+                "svg": get_extraction_step_svg(4, "Size Reduction"),
+            },
+        ]
+        archetype_steps = [
+            {
+                "step_num": f"{i+5:02d}",
+                "title": title,
+                "detail": detail,
+                "svg": get_extraction_step_svg(i + 5, title),
             }
+            for i, (title, detail) in enumerate(arche["steps"])
         ]
 
-    # --- 2. Curcuma longa (Turmeric - 강황/울금) ---
-    elif "curcuma" in p_low or "turmeric" in p_low or "강황" in p_low or "울금" in p_low:
-        return [
-            {
-                "rank": 1,
-                "name": "Supercritical CO2 Stepwise Curcuminoid Fractionation (초임계 CO₂ 2단계 정유·커큐미노이드 분획 추출법)",
-                "category": "Green Solvent Stepwise Polyphenol Separation Protocol",
-                "condition": "1단계(정유): 15 MPa, 40°C Pure CO₂ | 2단계(커큐민): 40 MPa, 50°C CO₂ + 10% Ethanol",
-                "target_components": "Curcumin, Demethoxycurcumin, Bisdemethoxycurcumin, ar-Turmerone (Essential Oil)",
-                "yield_boost": "커큐미노이드 순도 92% 이상 | 정유 성분 100% 독립 분리 수득",
-                "sop_steps": [
-                    {
-                        "step_num": "01",
-                        "title": "뿌리줄기 동결건조 & 미세분쇄 (Rhizome Cryo-Milling)",
-                        "detail": f"{clean_plant} 뿌리줄기(Rhizome)를 40°C 동결건조 후 입도 60 mesh 크기로 초저온 동결 분쇄합니다.",
-                        "svg": get_extraction_step_svg(1, "Rhizome Cryo-Milling")
-                    },
-                    {
-                        "step_num": "02",
-                        "title": "1단계 정유 초임계 추출 (Phase 1: Essential Oil Extraction)",
-                        "detail": "15 MPa, 40°C 저압 초임계 CO₂ 상태에서 60분간 순환시켜 튜메론(Turmerone) 휘발성 정유를 1차 독립 수득합니다.",
-                        "svg": get_extraction_step_svg(2, "Phase 1 Essential Oil")
-                    },
-                    {
-                        "step_num": "03",
-                        "title": "2단계 고압 커큐민 분획 (Phase 2: High-Pressure Curcuminoid Extraction)",
-                        "detail": "추출조 압력을 40 MPa로 올리고 95% 에탄올 보조용매 10 v/v%를 투입하여 황색 커큐미노이드 복합체를 정밀 추출합니다.",
-                        "svg": get_extraction_step_svg(3, "Phase 2 Curcuminoid")
-                    },
-                    {
-                        "step_num": "04",
-                        "title": "세퍼레이터 분리 & 용매 회수 (Separator Fractionation & Solvent Recycle)",
-                        "detail": "분리조에서 에탄올 농축액을 수집하고 CO₂ 기체는 99.5% 연속 회수 처리합니다.",
-                        "svg": get_extraction_step_svg(4, "CO2 Solvent Recycle")
-                    },
-                    {
-                        "step_num": "05",
-                        "title": "재결정 정제 & HPLC 분석 (Recrystallization & Curcuminoid HPLC)",
-                        "detail": "농축 분말을 이소프로판올로 재결정 정제하여 HPLC-UV (425 nm)로 커큐민 3종 유효 성분을 확정합니다.",
-                        "svg": get_extraction_step_svg(5, "Curcuminoid HPLC Assay")
-                    }
-                ],
-                "rationale": f"{clean_plant} 뿌리줄기 내 정유(Turmerone)와 커큐미노이드(Curcumin)의 용해도 차이를 이용해 초임계 CO₂ 압력 2단계 제어로 고순도 독립 분리하는 첨단 추출법.",
-                "evidence_paper_title": f"Fractionation of curcuminoids and essential oil from {clean_plant} using supercritical CO2",
-                "evidence_paper_url": pubmed_url,
-                "evidence_scholar_url": scholar_url,
-                "evidence_patent_title": f"Process for high-purity curcumin extraction from {clean_plant}",
-                "evidence_patent_url": patent_url,
-                "source_type": "Journal of Supercritical Fluids & USPTO Patent"
-            },
-            {
-                "rank": 2,
-                "name": "Microwave-Assisted Organic Extraction (MAE 마이크로웨이브 조화 커큐민 추출법)",
-                "category": "Electromagnetic Energy Rapid Cell-Disruption Protocol",
-                "condition": "마이크로웨이브 출력: 600 W | 용매: 80% Acetone or Ethanol (1:10 w/v) | 온도: 65°C | 시간: 15 min",
-                "target_components": "Curcuminoids (Curcumin I, II, III), Phenolic Compounds",
-                "yield_boost": "추출 소요 시간 15분 (기존 대비 80% 단축) | 추출 수율 +36.5% 향상",
-                "sop_steps": [
-                    {
-                        "step_num": "01",
-                        "title": "시료 서스펜션 반응조 투입 (Sample Suspension Loading)",
-                        "detail": f"{clean_plant} 분말 100g을 80% 에탄올 용매 1.0 L에 투입하여 마이크로웨이브 추출 용기에 채웁니다.",
-                        "svg": get_extraction_step_svg(1, "MAE Sample Loading")
-                    },
-                    {
-                        "step_num": "02",
-                        "title": "마이크로웨이브 전자기 파라미터 세팅 (Microwave Radiation Calibration)",
-                        "detail": "산업용 MAE 시스템 반응조에 출력 600 W, 온도 65°C 상한 파라미터를 입력합니다.",
-                        "svg": get_extraction_step_svg(2, "MAE Calibration")
-                    },
-                    {
-                        "step_num": "03",
-                        "title": "전자기 가열 세포벽 순간 팽창 파쇄 (Rapid Dipolar Internal Cell Heating)",
-                        "detail": "2.45 GHz 전자기파가 극성 분자를 분당 수억 회 진동시켜 세포 내부 압력을 급증시켜 강황 세포막을 15분 만에 완전 붕괴시킵니다.",
-                        "svg": get_extraction_step_svg(3, "MAE Rapid Heating")
-                    },
-                    {
-                        "step_num": "04",
-                        "title": "감압 여과 & 용매 증발 농축 (Vacuum Filtration & Rotary Evaporating)",
-                        "detail": "여과지를 통과시킨 후 회전 농축기(45°C)에서 용매를 신속히 증발 수득합니다.",
-                        "svg": get_extraction_step_svg(4, "Rotary Evaporating")
-                    },
-                    {
-                        "step_num": "05",
-                        "title": "동결건조 & HPLC 분석 (Freeze Drying & Quantitative HPLC)",
-                        "detail": "동결건조 후 HPLC로 커큐민 3종 함량을 정량 평가합니다.",
-                        "svg": get_extraction_step_svg(5, "Curcumin HPLC")
-                    }
-                ],
-                "rationale": f"마크로웨이브 전자기파 분자 유도 가열을 통해 {clean_plant} 뿌리의 견고한 조직을 15분 이내에 파쇄하여 커큐민을 고속 침출하는 고효율 공정.",
-                "evidence_paper_title": f"Microwave-assisted extraction of curcuminoids from {clean_plant}: Process Optimization",
-                "evidence_paper_url": pubmed_url,
-                "evidence_scholar_url": scholar_url,
-                "evidence_patent_title": f"Microwave extraction process for turmeric polyphenols",
-                "evidence_patent_url": patent_url,
-                "source_type": "Industrial Crops and Products & EPO Patent"
-            },
-            {
-                "rank": 3,
-                "name": "Alkaline Extraction & Acid Precipitation (알칼리 용출 산 석출 고순도 커큐민 정제법)",
-                "category": "Chemical pH-Shift Selective Crystallization Protocol",
-                "condition": "알칼리 용출: pH 11.5 (0.5 M NaOH), 25°C, 30 min | 산 석출: pH 3.5 (HCl 조절), 5°C",
-                "target_components": "Pure Curcumin (USP/EP Grade Crystals > 98%)",
-                "yield_boost": "결정화 순도 98.5% 달성 | 산업용 고순도 의약품 원료 규격 충족",
-                "sop_steps": [
-                    {
-                        "step_num": "01",
-                        "title": "알칼리 용액 시료 현탁 (Alkaline Suspension Preparation)",
-                        "detail": f"{clean_plant} 시료를 0.5 M NaOH 알칼리 용액(pH 11.5)에 투입하여 커큐민을 수용성 페놀레이트 염으로 신속 전환시킵니다.",
-                        "svg": get_extraction_step_svg(1, "Alkaline Suspension")
-                    },
-                    {
-                        "step_num": "02",
-                        "title": "불용성 전분·섬유질 원심 분리 (Insoluble Starch Centrifugation)",
-                        "detail": "알칼리에 용해되지 않는 전분과 섬유질 찌꺼기를 원심분리(4,500 rpm)로 1차 분리 배출합니다.",
-                        "svg": get_extraction_step_svg(2, "Starch Centrifugation")
-                    },
-                    {
-                        "step_num": "03",
-                        "title": "산 첨가 커큐민 황색 침전 (Acidic Precipitation of Curcumin)",
-                        "detail": "상등액에 1.0 M HCl을 서서히 적하하여 pH 3.5로 중화 산성화시킴으로써 황색 커큐민 결정 결정을 고율 침전시킵니다.",
-                        "svg": get_extraction_step_svg(3, "Acidic Precipitation")
-                    },
-                    {
-                        "step_num": "04",
-                        "title": "결정 세척 여과 & 세척 (Crystal Wash & Filtration)",
-                        "detail": "석출된 황색 침전물을 감압 여과하고 냉수로 3회 세척하여 잔류 염을 완전히 제거합니다.",
-                        "svg": get_extraction_step_svg(4, "Crystal Wash")
-                    },
-                    {
-                        "step_num": "05",
-                        "title": "진공 건조 & 의약품 규격 정량 (Vacuum Drying & Purity Test)",
-                        "detail": "50°C 진공 건조기에서 건조 후 HPLC로 커큐민 98% 이상 purity 표준을 검증합니다.",
-                        "svg": get_extraction_step_svg(5, "Purity Test HPLC")
-                    }
-                ],
-                "rationale": f"커큐민의 페놀성 수산기(Phenolic -OH)가 알칼리 조건에서 가용성 염으로 변하고 산성 조건에서 유기 결정으로 침전하는 pH 변환 화학 정제 공정.",
-                "evidence_paper_title": f"pH-driven selective extraction and crystallization of curcumin from {clean_plant}",
-                "evidence_paper_url": pubmed_url,
-                "evidence_scholar_url": scholar_url,
-                "evidence_patent_title": f"Method for alkaloid-free curcumin crystallization",
-                "evidence_patent_url": patent_url,
-                "source_type": "Journal of Chemical Technology & USPTO Patent"
-            }
-        ]
+        proposals.append({
+            "rank": rank,
+            "name": arche["name"],
+            "category": arche["category"],
+            "condition": arche["condition"],
+            "target_components": arche["target_components"],
+            "yield_boost": arche["yield_boost"],
+            "sop_steps": pretreatment_steps + archetype_steps,
+            "rationale": arche["rationale"],
+            # [수정] 특정 논문을 검증한 것처럼 지어내지 않고, 검색 링크임을 명시함
+            # (사용자 요청: 레퍼런스가 실제로 없으면 없다고 나와야 함).
+            "evidence_paper_title": f"PubMed 문헌 검색: {clean_plant} · {tp['part_label']} · {arche['name'].split('(')[0].strip()} (특정 논문 자동 검증 안 됨 — 검색 링크 제공)",
+            "evidence_paper_url": pubmed_url,
+            "evidence_scholar_url": scholar_url,
+            "evidence_patent_title": f"관련 특허 검색: {clean_plant} {tp['part_label']} 추출 공정 (특정 특허 자동 검증 안 됨)",
+            "evidence_patent_url": patent_url,
+            "source_type": "PubMed / Google Patents 검색 링크 (개별 문헌 자동 검증 안 됨)",
+        })
 
-    # --- 3. Justicia procumbens (쥐꼬리망초) ---
-    elif "justicia" in p_low or "쥐꼬리망초" in p_low or "procumbens" in p_low:
-        return [
-            {
-                "rank": 1,
-                "name": "Aqueous Two-Phase Extraction (ATPE 수계 이상 분계 리그난 정밀 추출법)",
-                "category": "Biphasic Green Liquid-Liquid Lignan Partitioning Protocol",
-                "condition": "분계 조성: K2HPO4 (18 wt%) + Ethanol (22 wt%) | pH: 7.2 | 온도: 25°C | 분리시간: 30 min",
-                "target_components": "Justicidin A, Justicidin B, Justicidin C, Diphyllin (Arylnaphthalene Lignans)",
-                "yield_boost": "Justicidin A/B 리그난 회수율 94.2% | 불순 다당류 99% 1차 배출",
-                "sop_steps": [
-                    {
-                        "step_num": "01",
-                        "title": "전초 시료 분쇄 & 수계 서스펜션 (Whole Herb Milling & Suspension)",
-                        "detail": f"{clean_plant} 전초(Whole Herb)를 40°C 동결건조 후 60 mesh로 미쇄 분쇄하고 분계용 용매에 투입합니다.",
-                        "svg": get_extraction_step_svg(1, "Herb Milling")
-                    },
-                    {
-                        "step_num": "02",
-                        "title": "수계 이상 분계 믹싱 (ATPE Biphasic System Mixing)",
-                        "detail": "K2HPO4 염 수용액 18 wt% 및 에탄올 22 wt%를 혼합하여 상부(에탄올 풍부상)와 하부(염 수계상) 2상 분계를 형성합니다.",
-                        "svg": get_extraction_step_svg(2, "ATPE Biphasic System")
-                    },
-                    {
-                        "step_num": "03",
-                        "title": "리그난 선별 상분리 (Selective Lignan Partitioning)",
-                        "detail": "25°C에서 30분간 진탕 후 정치시킵니다. 지용성 아릴나프탈렌 리그난(Justicidin A/B)은 상부 에탄올상으로 94% 이상 이동하고, 수용성 다당류는 하부 염상으로 고율 분리됩니다.",
-                        "svg": get_extraction_step_svg(3, "Selective Lignan Partitioning")
-                    },
-                    {
-                        "step_num": "04",
-                        "title": "상부 에탄올상 수집 & 감압 농축 (Top Phase Collection & Evaporating)",
-                        "detail": "상부 에탄올상을 분리 수집하여 회전 농축기(40°C)에서 에탄올을 회수하고 엑기스를 수득합니다.",
-                        "svg": get_extraction_step_svg(4, "Top Phase Evaporating")
-                    },
-                    {
-                        "step_num": "05",
-                        "title": "동결건조 & HPLC Justicidin 정량 (Lyophilization & Justicidin HPLC Assay)",
-                        "detail": "동결건조 후 HPLC-UV (258 nm)로 Justicidin A 및 B 지표 리그난 성분을 정량 분석 확정합니다.",
-                        "svg": get_extraction_step_svg(5, "Justicidin HPLC Assay")
-                    }
-                ],
-                "rationale": f"{clean_plant}에 존재하는 강력한 항바이러스 리그난 성분인 Justicidin A/B를 수용성 불순 다당류와 2상 액체 분획으로 94% 이상 고순도 선별 추출하는 분계 기술.",
-                "evidence_paper_title": f"Aqueous two-phase extraction of arylnaphthalene lignans from {clean_plant}",
-                "evidence_paper_url": pubmed_url,
-                "evidence_scholar_url": scholar_url,
-                "evidence_patent_title": f"Process for isolating justicidin lignans from {clean_plant}",
-                "evidence_patent_url": patent_url,
-                "source_type": "Separation and Purification Technology & KIPRIS Patent"
-            },
-            {
-                "rank": 2,
-                "name": "Pressurized Liquid Extraction (PLE 가압 고온 에탄올 리그난 추출법)",
-                "category": "High-Pressure Subcritical Solvent Extraction Protocol",
-                "condition": "압력: 10.0–12.0 MPa | 온도: 100°C | 용매: 75% Ethanol | 펄스 횟수: 3 Static Cycles (각 5분)",
-                "target_components": "Arylnaphthalene Lignan Glycosides, Clinacosides, Diphyllin derivatives",
-                "yield_boost": "추출 수율 +42.0% 증대 | 용매 사용량 70% 절감",
-                "sop_steps": [
-                    {
-                        "step_num": "01",
-                        "title": "고압 셀 시료 패킹 (PLE High-Pressure Cell Loading)",
-                        "detail": f"{clean_plant} 건조 분말 50g을 규조토와 혼합하여 PLE Stainless Steel Cell에 균일 충진합니다.",
-                        "svg": get_extraction_step_svg(1, "PLE Stainless Cell")
-                    },
-                    {
-                        "step_num": "02",
-                        "title": "가압 에탄올 용매 예열 주입 (Preheated Pressurized Solvent Injection)",
-                        "detail": "75% 에탄올 용매를 셀 내로 주입하고 12.0 MPa 가압 및 100°C 예열 상태를 형성합니다.",
-                        "svg": get_extraction_step_svg(2, "PLE Preheated Solvent")
-                    },
-                    {
-                        "step_num": "03",
-                        "title": "정적 가압 침출 사이클 (Static Pressurized Extraction Cycles)",
-                        "detail": "고압 상태에서 고온 에탄올이 세포 벽 내부 리그난 가교 결합을 신속 침투해 5분씩 3회 사이클로 완벽 침출합니다.",
-                        "svg": get_extraction_step_svg(3, "PLE Static Cycles")
-                    },
-                    {
-                        "step_num": "04",
-                        "title": "질소 퍼지 & 여액 수집 (N2 Gas Purge & Extract Collection)",
-                        "detail": "고압 N2 가스를 퍼지하여 셀 내부 추출 잔류액을 100% 바이알에 자동 정량 수집합니다.",
-                        "svg": get_extraction_step_svg(4, "N2 Gas Purge")
-                    },
-                    {
-                        "step_num": "05",
-                        "title": "감압 농축 & LC-MS 정량 (Rotary Evaporating & LC-MS Assay)",
-                        "detail": "감압 농축 후 LC-MS/MS (MRM Mode)로 Diphyllin 및 Justicidin 리그난 함량을 분석합니다.",
-                        "svg": get_extraction_step_svg(5, "LC-MS Lignan Assay")
-                    }
-                ],
-                "rationale": f"고압(12 MPa) 하에서 에탄올 용매의 점도를 낮추고 유전상수를 최적화하여 {clean_plant} 세포 내부 리그난 배당체를 단시간 내 고수율 분리.",
-                "evidence_paper_title": f"Pressurized liquid extraction of antiviral lignans from {clean_plant}",
-                "evidence_paper_url": pubmed_url,
-                "evidence_scholar_url": scholar_url,
-                "evidence_patent_title": f"High-pressure extraction method for Justicidin compounds",
-                "evidence_patent_url": patent_url,
-                "source_type": "Journal of Chromatography A & USPTO Patent"
-            },
-            {
-                "rank": 3,
-                "name": "Ultrasonic-Enzymatic Combined Extraction (초음파-다당류 효소 융합 리그난 추출법)",
-                "category": "Acousto-Enzymatic Synergistic Protocol",
-                "condition": "효소: Cellulase (1.0 wt%) | 초음파: 40 kHz, 300 W | 용매: 50% Ethanol | 온도: 45°C | 시간: 60 min",
-                "target_components": "Bound Lignans, Flavonoids, Phenolic Acids",
-                "yield_boost": "결합형 리그난 유리율 2.6배 상승 | 추출 수율 +38.5%",
-                "sop_steps": [
-                    {
-                        "step_num": "01",
-                        "title": "효소 반응 슬러리 조제 (Enzymatic Slurry Preparation)",
-                        "detail": f"{clean_plant} 분말을 50% 에탄올 완충액에 투입하고 Cellulase 1.0 wt%를 가해 믹싱합니다.",
-                        "svg": get_extraction_step_svg(1, "Enzymatic Slurry")
-                    },
-                    {
-                        "step_num": "02",
-                        "title": "초음파-효소 시너지 반응 세팅 (Acousto-Enzymatic Setup)",
-                        "detail": "초음파 조사 장치가 부착된 항온 효소 반응조에 시료를 투입하고 45°C, 40 kHz로 설정합니다.",
-                        "svg": get_extraction_step_svg(2, "Acousto-Enzymatic Setup")
-                    },
-                    {
-                        "step_num": "03",
-                        "title": "효소 절단 & 음향 캐비테이션 시너지 (Enzymatic Cleavage & Cavitation Synergy)",
-                        "detail": "효소가 섬유소 세포벽을 화학 분해하는 동시에 초음파 기포가 물리 파쇄를 촉진하는 융합 작용이 일어납니다.",
-                        "svg": get_extraction_step_svg(3, "Enzymatic Cleavage Synergy")
-                    },
-                    {
-                        "step_num": "04",
-                        "title": "효소 불활성화 & 여과 (Thermal Inactivation & Filtration)",
-                        "detail": "85°C 열처리로 효소를 불활성화한 후 0.45 µm 멤브레인 여과기로 수용액 상등액을 수득합니다.",
-                        "svg": get_extraction_step_svg(4, "Thermal Inactivation Filter")
-                    },
-                    {
-                        "step_num": "05",
-                        "title": "동결건조 & HPLC 분석 (Freeze Drying & HPLC Assay)",
-                        "detail": "진공 동결건조 후 HPLC로 유효 리그난 수율을 검증합니다.",
-                        "svg": get_extraction_step_svg(5, "HPLC Lignan Assay")
-                    }
-                ],
-                "rationale": f"효소의 화학적 다당류 절단과 초음파의 물리적 캐비테이션 파쇄가 동시 작용하여 {clean_plant}의 결합형 리그난 성분을 유리화시키는 첨단 융합 공정.",
-                "evidence_paper_title": f"Synergistic ultrasonic-enzymatic extraction of bioactive lignans from {clean_plant}",
-                "evidence_paper_url": pubmed_url,
-                "evidence_scholar_url": scholar_url,
-                "evidence_patent_title": f"Combined enzymatic and ultrasonic process for plant lignans",
-                "evidence_patent_url": patent_url,
-                "source_type": "Ultrasonics Sonochemistry & WIPO Patent"
-            }
-        ]
-
-    # --- 4. Generic Plant Fallback (일반 식물 공통 맞춤형 추출 엔진) ---
-    else:
-        return [
-            {
-                "rank": 1,
-                "name": f"Supercritical CO2 Selective Extraction ({clean_plant} 특화 초임계 CO₂ 정밀 추출법)",
-                "category": "Green Solvent Plant-Specific Supercritical Protocol",
-                "condition": f"압력: 35–45 MPa | 유체 온도: 45°C | 보조용매: 95% Ethanol (7.5 v/v%) | 공정시간: 120 min",
-                "target_components": f"{clean_plant} {part_clean} 유래 핵심 테르페노이드, 지용성 플라보노이드 및 정유 유효 성분",
-                "yield_boost": "유효성분 회수율 +38.0% 증대 | 잔류 유기용매 0.0 ppm (100% Eco-Green)",
-                "sop_steps": [
-                    {
-                        "step_num": "01",
-                        "title": "원료 수집 & 동결건조 전처리 (Material Pretreatment)",
-                        "detail": f"{clean_plant}의 부위({part_clean})를 45°C 건조 후 동결하여 40–60 mesh로 분쇄하고 수분 함량을 4.5% 이하로 미세 제어합니다.",
-                        "svg": get_extraction_step_svg(1, "Material Pretreatment")
-                    },
-                    {
-                        "step_num": "02",
-                        "title": "SFE 추출조 장전 & 예열 (Extractor Vessel Loading)",
-                        "detail": f"고압 SFE 용기에 {clean_plant} 분쇄 시료를 균일 패킹하고 유체(CO₂) 및 7.5% 에탄올 보조용매를 예열 주입합니다.",
-                        "svg": get_extraction_step_svg(2, "Extractor Vessel Loading")
-                    },
-                    {
-                        "step_num": "03",
-                        "title": "초임계 CO₂ 순환 침출 (Supercritical Fluid Extraction)",
-                        "detail": f"40 MPa 고압 하에 45°C 항온 상태에서 120분간 등압 순환하여 {clean_plant} 유효 분획물을 고용해도 상태로 용출시킵니다.",
-                        "svg": get_extraction_step_svg(3, "Supercritical Fluid Extraction")
-                    },
-                    {
-                        "step_num": "04",
-                        "title": "세퍼레이터 분리 & CO₂ 기체 회수 (Separator Fractionation)",
-                        "detail": "분리조에서 유효 농축액을 수집하고 CO₂ 기체는 99% 연속 순환 회수 처리합니다.",
-                        "svg": get_extraction_step_svg(4, "Separator Fractionation")
-                    },
-                    {
-                        "step_num": "05",
-                        "title": "동결건조 & HPLC 유효성분 분석 (Freeze Drying & HPLC Assay)",
-                        "detail": f"진공 동결건조 후 HPLC-PDA로 {clean_plant} 유효 성분 수율을 최종 검증합니다.",
-                        "svg": get_extraction_step_svg(5, "Freeze Drying & HPLC Assay")
-                    }
-                ],
-                "rationale": f"{clean_plant} {part_clean}의 열에 약한 유효 성분을 열가열 없이 초임계 CO₂ 유체 미세 침투력으로 고순도 무독성 분리하는 기술.",
-                "evidence_paper_title": f"Phytochemical extraction and bioactivity optimization of {clean_plant}",
-                "evidence_paper_url": pubmed_url,
-                "evidence_scholar_url": scholar_url,
-                "evidence_patent_title": f"Method for extraction of antiviral fractions from {clean_plant}",
-                "evidence_patent_url": patent_url,
-                "source_type": "Journal of Natural Products & WIPO Patent"
-            },
-            {
-                "rank": 2,
-                "name": f"Ultrasound-Assisted Hydro-Ethanolic Extraction ({clean_plant} 초음파 조화 에탄올 추출법)",
-                "category": "Acoustic Cavitation Cell-Disruption Protocol",
-                "condition": f"주파수: 40 kHz | 음향 파워: 450 W | 용매: 65% Ethanol (1:15 w/v) | 온도: 50°C | 시간: 45 min",
-                "target_components": f"{clean_plant} 수용성 폴리페놀, 플라보노이드 및 극성 배당체 성분",
-                "yield_boost": "추출 효율 +45.0% 향상 | 추출 시간 60% 단축",
-                "sop_steps": [
-                    {
-                        "step_num": "01",
-                        "title": "원료 슬러리 서스펜션 조제 (Slurry Suspension)",
-                        "detail": f"{clean_plant} {part_clean} 분말을 65% 발효 에탄올 용매에 투입하여 균일 서스펜션을 조제합니다.",
-                        "svg": get_extraction_step_svg(1, "Slurry Suspension")
-                    },
-                    {
-                        "step_num": "02",
-                        "title": "초음파 추출조 변환기 세팅 (Ultrasonic Setup)",
-                        "detail": "산업용 초음파 추출 반응조에 시료를 투입하고 주파수 40 kHz, 음향 파워 450 W로 설정합니다.",
-                        "svg": get_extraction_step_svg(2, "Ultrasonic Setup")
-                    },
-                    {
-                        "step_num": "03",
-                        "title": "수중 음향 캐비테이션 파쇄 (Acoustic Cavitation)",
-                        "detail": "50°C 항온 상태에서 45분간 초음파를 조사하여 식물 세포벽을 기계적 파쇄하고 유효 성분을 무손실 분출시킵니다.",
-                        "svg": get_extraction_step_svg(3, "Acoustic Cavitation")
-                    },
-                    {
-                        "step_num": "04",
-                        "title": "고액 여과 & 회전 감압 농축 (Filtration & Rotary Evaporating)",
-                        "detail": "0.45 µm 필터 여과 후 Rotary Evaporator(45°C)에서 용매를 회수 농축합니다.",
-                        "svg": get_extraction_step_svg(4, "Filtration & Rotary Evaporating")
-                    },
-                    {
-                        "step_num": "05",
-                        "title": "동결건조 & 총 플라보노이드 검정 (Lyophilization & TFC Assay)",
-                        "detail": "동결건조기에서 고분말화 후 UV-Vis Spectrophotometer로 총 플라보노이드 수율을 검증합니다.",
-                        "svg": get_extraction_step_svg(5, "Lyophilization & TFC Assay")
-                    }
-                ],
-                "rationale": f"초음파 수중 음향 캐비테이션 기포의 폭발적 파쇄 파동이 {clean_plant} 세포벽 미세 구조를 파쇄하여 유효성분의 침출 속도를 극대화.",
-                "evidence_paper_title": f"Ultrasound-assisted extraction of bioactive compounds from {clean_plant}",
-                "evidence_paper_url": pubmed_url,
-                "evidence_scholar_url": scholar_url,
-                "evidence_patent_title": f"High-efficiency ultrasound process for {clean_plant} extracts",
-                "evidence_patent_url": patent_url,
-                "source_type": "Ultrasonics Sonochemistry & USPTO Patent"
-            },
-            {
-                "rank": 3,
-                "name": f"Enzyme-Assisted Aqueous Extraction ({clean_plant} 효소 조화 수계 추출법)",
-                "category": "Biocatalytic Cell-Wall Depolymerization Protocol",
-                "condition": "복합 효소: Cellulase + Pectinase (1:1 w/w, 1.8 wt%) | pH: 4.8 완충액 | 온도: 50°C | 시간: 180 min",
-                "target_components": f"{clean_plant} 결합형 배당체, 다당류 및 수용성 항산화 유효 성분",
-                "yield_boost": "생체이용률 +32.0% 증가 | 결합형 배당체 유리율 2.5배 상승",
-                "sop_steps": [
-                    {
-                        "step_num": "01",
-                        "title": "효소 완충액 반응계 조제 (Enzyme Buffer Formulation)",
-                        "detail": "pH 4.8 구연산 완충액에 셀룰레이스 및 펙티네이스 효소 1.8 wt%를 용해 조제합니다.",
-                        "svg": get_extraction_step_svg(1, "Enzyme Buffer Formulation")
-                    },
-                    {
-                        "step_num": "02",
-                        "title": "식물 시료 현탁 & 믹싱 (Sample Suspension)",
-                        "detail": f"{clean_plant} {part_clean} 분말을 완충액에 현탁시킨 후 효소 용액을 주입하고 50°C 반응조에서 믹싱합니다.",
-                        "svg": get_extraction_step_svg(2, "Sample Suspension")
-                    },
-                    {
-                        "step_num": "03",
-                        "title": "생체 촉매 효소 가수분해 (Biocatalytic Hydrolysis)",
-                        "detail": "50°C 항온에서 3시간 동안 온화한 바이오 반응을 진행하여 세포벽 다당류 결합을 선택 절단하고 유효 배당체를 유리시킵니다.",
-                        "svg": get_extraction_step_svg(3, "Biocatalytic Hydrolysis")
-                    },
-                    {
-                        "step_num": "04",
-                        "title": "효소 열실활 & 원심분리 (Thermal Inactivation)",
-                        "detail": "90°C 가열로 효소를 불활성화시킨 후 원심분리(4,000 rpm)로 잔사를 제거하고 상등액을 수득합니다.",
-                        "svg": get_extraction_step_svg(4, "Thermal Inactivation")
-                    },
-                    {
-                        "step_num": "05",
-                        "title": "동결건조 & LC-MS 정량 매핑 (Freeze Drying & LC-MS Assay)",
-                        "detail": "상등 여액을 동결건조 후 LC-MS/MS 시스템으로 유효 배당체 함량을 최종 분석 정량합니다.",
-                        "svg": get_extraction_step_svg(5, "Freeze Drying & LC-MS Assay")
-                    }
-                ],
-                "rationale": f"셀룰레이스 및 펙티네이스 생체촉매가 {clean_plant} 세포벽 펙틴 결합 다당류를 온화하게 절단하여 결합형 유효 성분을 완벽 유리형으로 전환.",
-                "evidence_paper_title": f"Enzyme-assisted extraction of active constituents from {clean_plant}",
-                "evidence_paper_url": pubmed_url,
-                "evidence_scholar_url": scholar_url,
-                "evidence_patent_title": f"Enzymatic extraction method for compositions of {clean_plant}",
-                "evidence_patent_url": patent_url,
-                "source_type": "Bioresource Technology & EPO European Patent"
-            }
-        ]
+    return proposals
 
 
-def generate_single_protocol_pdf_bytes(prop: dict, plant_name: str, extract_part: str) -> bytes:
-    """Generates a clean, professional standalone binary .pdf file for an extraction protocol option."""
+
+def generate_single_protocol_pdf_bytes(prop: dict, plant_name: str, extract_part: str, accent_hex: str = "#059669") -> bytes:
+    """
+    [전면 개편] 내용이 빈약하고 디자인이 단조롭다는 피드백을 반영해 재설계함.
+    - 옵션 카드와 동일한 강조색(accent_hex)을 PDF 헤더/포인트 컬러로 반영
+    - Executive Summary, 근거/검증 자료, 한계 및 주의사항 섹션 신규 추가
+    - SOP 단계마다 번호 배지 + 구분선으로 가독성 강화
+    - 페이지 하단에 페이지 번호 및 생성 정보 푸터 추가
+    - 전반적으로 폰트 크기/여백을 키워 리포트 형식에 맞는 밀도로 조정
+    """
     import io
     import os
+    from datetime import datetime
     from reportlab.lib.pagesizes import A4
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
+    from reportlab.lib.units import mm
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
     clean_p_name = plant_name.split("(")[0].strip()
     clean_p_part = extract_part.split("(")[0].strip()
 
-    # [버그 수정] 원본은 font_path = r"C:\Windows\Fonts\malgun.ttf" 를 썼는데
-    # 이 경로는 Windows에만 존재함. Streamlit Cloud(리눅스)에서는 항상
-    # os.path.exists()가 False라 조용히 Helvetica로 폴백되고, Helvetica는
-    # 한글 글리프가 없어서 PDF의 모든 한글이 빈칸/깨짐으로 나오고 있었음.
-    # ReportLab에 내장된 한글 CID 폰트(외부 파일 불필요, OS 무관하게 항상 동작)로
-    # 교체함.
+    # [버그 수정 - 이전과 동일] Windows 전용 폰트 경로 대신 ReportLab 내장
+    # 한글 CID 폰트 사용 (외부 파일 불필요, OS 무관하게 항상 동작).
     font_name = "Helvetica"
     try:
         pdfmetrics.registerFont(UnicodeCIDFont("HYSMyeongJo-Medium"))
@@ -1280,103 +1018,191 @@ def generate_single_protocol_pdf_bytes(prop: dict, plant_name: str, extract_part
     except Exception:
         pass
 
+    try:
+        accent = colors.HexColor(accent_hex)
+    except Exception:
+        accent = colors.HexColor("#059669")
+    accent_dark = colors.HexColor("#0f172a")
+    accent_light = colors.HexColor("#f8fafc")
+
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=36,
-        leftMargin=36,
-        topMargin=36,
-        bottomMargin=36
+        rightMargin=40,
+        leftMargin=40,
+        topMargin=34,
+        bottomMargin=42
     )
 
     styles = getSampleStyleSheet()
 
     title_style = ParagraphStyle(
-        'DocTitle',
-        parent=styles['Normal'],
-        fontName=font_name,
-        fontSize=15,
-        leading=19,
-        textColor=colors.HexColor('#065f46'),
-        spaceAfter=4
+        'DocTitle', parent=styles['Normal'], fontName=font_name,
+        fontSize=17, leading=22, textColor=colors.white, spaceAfter=2
     )
-
-    subtitle_style = ParagraphStyle(
-        'DocSubTitle',
-        parent=styles['Normal'],
-        fontName=font_name,
-        fontSize=9.5,
-        leading=13,
-        textColor=colors.HexColor('#047857'),
-        spaceAfter=12
+    header_meta_style = ParagraphStyle(
+        'HeaderMeta', parent=styles['Normal'], fontName=font_name,
+        fontSize=10, leading=14, textColor=colors.white
     )
-
+    kicker_style = ParagraphStyle(
+        'Kicker', parent=styles['Normal'], fontName=font_name,
+        fontSize=9, leading=12, textColor=colors.HexColor('#64748b'), spaceAfter=10
+    )
     heading_style = ParagraphStyle(
-        'SectionHeader',
-        parent=styles['Normal'],
-        fontName=font_name,
-        fontSize=11,
-        leading=15,
-        textColor=colors.HexColor('#064e3b'),
-        spaceBefore=8,
-        spaceAfter=5
+        'SectionHeader', parent=styles['Normal'], fontName=font_name,
+        fontSize=13, leading=17, textColor=accent_dark, spaceBefore=14, spaceAfter=7
     )
-
+    subheading_style = ParagraphStyle(
+        'SubHeader', parent=styles['Normal'], fontName=font_name,
+        fontSize=10.5, leading=14, textColor=accent, spaceBefore=2, spaceAfter=3
+    )
     body_style = ParagraphStyle(
-        'BodyTextKor',
-        parent=styles['Normal'],
-        fontName=font_name,
-        fontSize=9,
-        leading=13.5,
-        textColor=colors.HexColor('#1e293b')
+        'BodyTextKor', parent=styles['Normal'], fontName=font_name,
+        fontSize=10, leading=15.5, textColor=colors.HexColor('#1e293b')
+    )
+    small_style = ParagraphStyle(
+        'SmallTextKor', parent=styles['Normal'], fontName=font_name,
+        fontSize=8.5, leading=13, textColor=colors.HexColor('#64748b')
+    )
+    disclaimer_style = ParagraphStyle(
+        'DisclaimerKor', parent=styles['Normal'], fontName=font_name,
+        fontSize=8.5, leading=13, textColor=colors.HexColor('#92400e')
     )
 
     story = []
 
-    # Title Banner
     rank_num = prop.get('rank', 1)
     p_name = prop.get('name', '최적 식물 추출법 프로토콜')
     p_cat = prop.get('category', '공정 기술')
     y_boost = prop.get('yield_boost', '')
+    gen_date = datetime.now().strftime("%Y-%m-%d")
 
-    story.append(Paragraph(f"<b>[Option #{rank_num}] {p_name}</b>", title_style))
-    story.append(Paragraph(f"식물 학명: <b>{clean_p_name}</b> &nbsp;|&nbsp; 추출 부위: <b>{clean_p_part}</b> &nbsp;|&nbsp; 카테고리: <b>{p_cat}</b>", subtitle_style))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#34d399"), spaceAfter=10))
-
-    # Parameters Table
-    param_data = [
-        [Paragraph("<b>수율 향상 지표</b>", body_style), Paragraph(f"<b>{y_boost}</b>", body_style)],
-        [Paragraph("<b>공정 제어 파라미터</b>", body_style), Paragraph(f"{prop.get('condition', '')}", body_style)],
-        [Paragraph("<b>타깃 유효 화학 성분</b>", body_style), Paragraph(f"{prop.get('target_components', '')}", body_style)]
-    ]
-    param_table = Table(param_data, colWidths=[120, 400])
-    param_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (0,-1), colors.HexColor('#f0fdf4')),
-        ('BACKGROUND', (1,0), (1,-1), colors.HexColor('#ffffff')),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#bbf7d0')),
-        ('PADDING', (0,0), (-1,-1), 5),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
+    # ── 헤더 배너 (옵션 색상 반영) ──────────────────────────────────────
+    header_tbl = Table(
+        [[Paragraph(f"[Option #{rank_num}] {p_name}", title_style)],
+         [Paragraph(f"{p_cat}", header_meta_style)]],
+        colWidths=[515]
+    )
+    header_tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), accent),
+        ('LEFTPADDING', (0, 0), (-1, -1), 16),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 16),
+        ('TOPPADDING', (0, 0), (0, 0), 14),
+        ('BOTTOMPADDING', (0, 0), (0, 0), 2),
+        ('TOPPADDING', (0, 1), (0, 1), 0),
+        ('BOTTOMPADDING', (0, 1), (0, 1), 14),
     ]))
-    story.append(param_table)
+    story.append(header_tbl)
     story.append(Spacer(1, 10))
+    story.append(Paragraph(
+        f"식물 학명: <b>{clean_p_name}</b> &nbsp;|&nbsp; 추출 부위: <b>{clean_p_part}</b> "
+        f"&nbsp;|&nbsp; 문서 생성일: {gen_date} &nbsp;|&nbsp; LitPhyto-PanInfluenza Engine",
+        kicker_style
+    ))
 
-    # SOP Steps
-    story.append(Paragraph("<b>단계별 정밀 표준 공정 프로토콜 (SOP Timeline)</b>", heading_style))
+    # ── Executive Summary ──────────────────────────────────────────────
+    story.append(Paragraph("Executive Summary", heading_style))
+    summary_data = [
+        [Paragraph("<b>수율 / 효율 향상 지표</b>", body_style), Paragraph(f"{y_boost}", body_style)],
+        [Paragraph("<b>공정 제어 파라미터</b>", body_style), Paragraph(f"{prop.get('condition', '')}", body_style)],
+        [Paragraph("<b>타깃 유효 화학 성분</b>", body_style), Paragraph(f"{prop.get('target_components', '')}", body_style)],
+        [Paragraph("<b>총 공정 단계 수</b>", body_style), Paragraph(f"{len(prop.get('sop_steps', []))}단계 (채집·전처리 4단계 + 방법론별 정밀 공정 단계)", body_style)],
+    ]
+    summary_table = Table(summary_data, colWidths=[130, 385])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), accent_light),
+        ('BACKGROUND', (1, 0), (1, -1), colors.white),
+        ('GRID', (0, 0), (-1, -1), 0.6, colors.HexColor('#e2e8f0')),
+        ('LINEBEFORE', (0, 0), (0, -1), 3, accent),
+        ('PADDING', (0, 0), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 6))
+
+    # ── 기술 메커니즘 근거 ────────────────────────────────────────────
+    story.append(Paragraph("기술 메커니즘 근거 (Technical Rationale)", heading_style))
+    story.append(Paragraph(f"{prop.get('rationale', '')}", body_style))
+    story.append(Spacer(1, 4))
+
+    # ── SOP 단계별 상세 프로토콜 ──────────────────────────────────────
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0"), spaceBefore=6, spaceAfter=2))
+    story.append(Paragraph("단계별 정밀 표준 공정 프로토콜 (SOP Timeline)", heading_style))
     for s in prop.get("sop_steps", []):
         s_num = s.get("step_num", "01")
         s_title = s.get("title", "")
         s_detail = s.get("detail", "")
-        step_text = f"<b>STEP {s_num}: {s_title}</b><br/>{s_detail}"
-        story.append(Paragraph(step_text, body_style))
-        story.append(Spacer(1, 5))
+        step_row = Table(
+            [[Paragraph(f"<b>{s_num}</b>", ParagraphStyle('Badge', parent=body_style, textColor=colors.white, alignment=1, fontSize=11)),
+              Paragraph(f"<b>{s_title}</b><br/>{s_detail}", body_style)]],
+            colWidths=[28, 487]
+        )
+        step_row.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, 0), accent),
+            ('BACKGROUND', (1, 0), (1, 0), accent_light),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+            ('PADDING', (0, 0), (0, 0), 6),
+            ('LEFTPADDING', (1, 0), (1, 0), 10),
+            ('TOPPADDING', (1, 0), (1, 0), 7),
+            ('BOTTOMPADDING', (1, 0), (1, 0), 7),
+        ]))
+        story.append(step_row)
+        story.append(Spacer(1, 4))
 
-    story.append(Spacer(1, 6))
-    # Rationale
-    story.append(Paragraph("<b>생물공학적 및 화학적 메커니즘 근거 (Technical Rationale)</b>", heading_style))
-    story.append(Paragraph(f"{prop.get('rationale', '')}", body_style))
+    # ── 근거 및 검증 자료 (정직하게 - 검증된 특정 논문 아님을 명시) ──
+    story.append(Spacer(1, 4))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0"), spaceBefore=4, spaceAfter=2))
+    story.append(Paragraph("근거 및 검증 자료 (Evidence &amp; References)", heading_style))
+    evid_rows = [
+        [Paragraph("<b>문헌 검색</b>", small_style), Paragraph(prop.get('evidence_paper_title', '-'), body_style)],
+        [Paragraph("<b>검색 링크</b>", small_style), Paragraph(prop.get('evidence_paper_url', '-'), small_style)],
+        [Paragraph("<b>특허 검색</b>", small_style), Paragraph(prop.get('evidence_patent_title', '-'), body_style)],
+        [Paragraph("<b>출처 구분</b>", small_style), Paragraph(prop.get('source_type', '-'), small_style)],
+    ]
+    evid_table = Table(evid_rows, colWidths=[80, 435])
+    evid_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f1f5f9')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('PADDING', (0, 0), (-1, -1), 7),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    story.append(evid_table)
 
-    doc.build(story)
+    # ── 한계 및 주의사항 ──────────────────────────────────────────────
+    story.append(Spacer(1, 10))
+    disclaimer_tbl = Table(
+        [[Paragraph(
+            "<b>한계 및 주의사항</b><br/>"
+            "본 프로토콜의 공정 조건(온도·압력·시간 등)은 문헌 기반 일반 원칙과 결정론적 추정 모델로 산출된 "
+            "권장값이며, 특정 논문에서 실측 검증된 수치가 아닙니다. 실제 적용 전 소규모 파일럿 테스트를 통한 "
+            "검증을 권장합니다. 위 '근거 및 검증 자료'의 링크는 관련 문헌을 탐색하기 위한 검색 링크이며, "
+            "특정 논문의 자동 인용 검증을 의미하지 않습니다.",
+            disclaimer_style
+        )]],
+        colWidths=[515]
+    )
+    disclaimer_tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fffbeb')),
+        ('BOX', (0, 0), (-1, -1), 0.8, colors.HexColor('#fbbf24')),
+        ('PADDING', (0, 0), (-1, -1), 10),
+    ]))
+    story.append(disclaimer_tbl)
+
+    # ── 페이지 하단 푸터 (페이지 번호 + 생성 정보) ────────────────────
+    def _footer(canvas, doc_):
+        canvas.saveState()
+        canvas.setStrokeColor(colors.HexColor('#e2e8f0'))
+        canvas.setLineWidth(0.6)
+        canvas.line(40, 30, A4[0] - 40, 30)
+        canvas.setFont('Helvetica', 8)
+        canvas.setFillColor(colors.HexColor('#94a3b8'))
+        canvas.drawString(40, 18, f"LitPhyto-PanInfluenza Engine · {clean_p_name} ({clean_p_part}) · Option #{rank_num}")
+        canvas.drawRightString(A4[0] - 40, 18, f"Page {doc_.page}")
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=_footer, onLaterPages=_footer)
     pdf_bytes = buffer.getvalue()
     buffer.close()
     return pdf_bytes
@@ -2205,11 +2031,14 @@ def main():
         start_time = time.time()
         api_key_to_pass = user_llm_key_input if 'user_llm_key_input' in locals() and user_llm_key_input else None
 
-        # --- High-Tech Lab Loading & Progress Interface ---
-        # [전면 개편] 기존엔 4단계 큰 텍스트만 바뀌는 정적인 느낌이었음.
-        # 이번엔 (1) 실제 연산 과정이 한 줄씩 흘러가는 터미널 로그 콘솔을 추가하고,
-        # (2) 결과 검토/QC 단계를 새로 추가해서 5단계로 늘리고,
-        # (3) 전체 소요 시간을 기존 대비 다시 2배로 늘림(5초 -> 10초).
+        # --- AI Processing Visualization (완전 재설계) ---
+        # [전면 재설계] 기존 카드+배지 디자인을 버리고 "AI가 실제로 돌아가는 느낌"을
+        # 주는 궤도 회전 애니메이션(이중 반대방향 링 + 펄스 코어) + 그라디언트
+        # 텍스트로 교체함. 또한 기존엔 "Target: H1N1 | Extract: 종명 (부위)"를
+        # 배지 하나에 다 욱여넣어서 종/부위 이름이 길면 배지 밖으로 텍스트가
+        # 삐져나오는 버그가 있었음(스크린샷으로 확인됨) - 이번엔 Target/종/부위를
+        # 각각 독립된 pill로 분리하고 flex-wrap을 줘서 길어지면 자연스럽게
+        # 다음 줄로 넘어가도록 고침 (절대 잘리지 않음).
         progress_placeholder = st.empty()
         status_placeholder = st.empty()
         console_placeholder = st.empty()
@@ -2217,71 +2046,82 @@ def main():
         with status_placeholder.container():
             st.markdown("""
             <style>
-            @keyframes lp_pulse {{
-                0%, 100% {{ box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45); }}
-                50% {{ box-shadow: 0 0 0 10px rgba(56, 189, 248, 0); }}
+            @keyframes ai_spin {{ from {{ transform: rotate(0deg); }} to {{ transform: rotate(360deg); }} }}
+            @keyframes ai_spin_rev {{ from {{ transform: rotate(360deg); }} to {{ transform: rotate(0deg); }} }}
+            @keyframes ai_pulse_core {{
+                0%, 100% {{ box-shadow: 0 0 0 0 rgba(129,140,248,0.55), 0 0 18px 3px rgba(129,140,248,0.35); }}
+                50% {{ box-shadow: 0 0 0 10px rgba(129,140,248,0), 0 0 26px 7px rgba(129,140,248,0.55); }}
             }}
-            @keyframes lp_shimmer {{
-                0% {{ transform: translateX(-100%); }}
-                100% {{ transform: translateX(250%); }}
+            @keyframes ai_fadein {{ from {{ opacity: 0; transform: translateY(6px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+            @keyframes ai_gradient_shift {{
+                0% {{ background-position: 0% 50%; }}
+                50% {{ background-position: 100% 50%; }}
+                100% {{ background-position: 0% 50%; }}
             }}
-            @keyframes lp_fadein {{
-                from {{ opacity: 0; transform: translateY(4px); }}
-                to {{ opacity: 1; transform: translateY(0); }}
+            @keyframes ai_blink {{ 0%, 49% {{ opacity: 1; }} 50%, 100% {{ opacity: 0; }} }}
+            @keyframes ai_linein {{ from {{ opacity: 0; transform: translateX(-6px); }} to {{ opacity: 1; transform: translateX(0); }} }}
+
+            .ai_wrap {{
+                background: linear-gradient(135deg, #0b1120 0%, #151b33 50%, #1a1035 100%);
+                background-size: 200% 200%;
+                animation: ai_gradient_shift 6s ease infinite, ai_fadein 0.4s ease;
+                border-radius: 16px 16px 0 0; border: 1px solid #2d3557; border-bottom: none;
+                padding: 22px 24px 18px 24px; position: relative; overflow: hidden;
             }}
-            @keyframes lp_blink {{
-                0%, 49% {{ opacity: 1; }}
-                50%, 100% {{ opacity: 0; }}
+            .ai_top_row {{ display: flex; align-items: center; gap: 16px; }}
+            .ai_orbit {{ position: relative; width: 52px; height: 52px; flex-shrink: 0; }}
+            .ai_orbit_ring {{ position: absolute; border-radius: 50%; border: 2.5px solid transparent; }}
+            .ai_orbit_ring.r1 {{ inset: 0; border-top-color: #818cf8; border-right-color: rgba(129,140,248,0.15); animation: ai_spin 2s linear infinite; }}
+            .ai_orbit_ring.r2 {{ inset: 9px; border-bottom-color: #38bdf8; border-left-color: rgba(56,189,248,0.15); animation: ai_spin_rev 1.4s linear infinite; }}
+            .ai_orbit_core {{
+                position: absolute; inset: 17px; border-radius: 50%;
+                background: radial-gradient(circle at 35% 30%, #c7d2fe, #6366f1 75%);
+                animation: ai_pulse_core 1.8s ease-in-out infinite;
+                display: flex; align-items: center; justify-content: center; font-size: 15px;
             }}
-            @keyframes lp_linein {{
-                from {{ opacity: 0; transform: translateX(-6px); }}
-                to {{ opacity: 1; transform: translateX(0); }}
+            .ai_title_block {{ flex: 1; min-width: 0; }}
+            .ai_title {{
+                font-size: 19px; font-weight: 800;
+                background: linear-gradient(90deg, #a5b4fc, #67e8f9, #a5b4fc);
+                background-size: 200% auto; -webkit-background-clip: text; background-clip: text;
+                -webkit-text-fill-color: transparent; color: #a5b4fc;
+                animation: ai_gradient_shift 3s linear infinite;
             }}
-            .lp_card {{
-                background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-                padding: 18px 20px; border-radius: 12px 12px 0 0; border: 1px solid #334155;
-                border-bottom: none; color: #ffffff; position: relative;
-                overflow: hidden; animation: lp_fadein 0.4s ease;
+            .ai_subtitle {{ font-size: 12px; color: #94a3b8; margin-top: 3px; }}
+            .ai_meta_row {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }}
+            .ai_meta_pill {{
+                background: rgba(129,140,248,0.14); border: 1px solid rgba(129,140,248,0.35);
+                color: #c7d2fe; font-size: 11.5px; font-weight: 700; padding: 5px 12px;
+                border-radius: 20px; white-space: nowrap; max-width: 100%;
             }}
-            .lp_card::before {{
-                content: ""; position: absolute; top: 0; left: 0;
-                width: 40%; height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(56,189,248,0.10), transparent);
-                animation: lp_shimmer 2.2s linear infinite;
-            }}
-            .lp_icon_badge {{
-                display: inline-flex; align-items: center; justify-content: center;
-                width: 34px; height: 34px; border-radius: 50%;
-                background: rgba(56, 189, 248, 0.15);
-                animation: lp_pulse 1.6s ease-out infinite;
-                font-size: 17px;
-            }}
-            .lp_console {{
-                background: #05070d; border: 1px solid #334155; border-top: none;
-                border-radius: 0 0 12px 12px; padding: 14px 20px; margin-bottom: 20px;
+            .ai_console {{
+                background: #03050c; border: 1px solid #2d3557; border-top: none;
+                border-radius: 0 0 16px 16px; padding: 16px 22px;
                 font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace;
-                font-size: 12.5px; line-height: 1.85; color: #6ee7b7;
+                font-size: 12.5px; line-height: 1.9; color: #a5f3fc;
                 min-height: 168px; max-height: 168px; overflow: hidden;
             }}
-            .lp_console_line {{
-                animation: lp_linein 0.25s ease;
-                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            }}
-            .lp_console_line.lp_done {{ color: #4b5563; }}
-            .lp_console_line.lp_current {{ color: #6ee7b7; font-weight: 700; }}
-            .lp_cursor {{
-                display: inline-block; color: #6ee7b7; animation: lp_blink 1s step-start infinite;
-            }}
+            .ai_console_line {{ animation: ai_linein 0.25s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+            .ai_console_line.ai_done {{ color: #475569; }}
+            .ai_console_line.ai_current {{ color: #67e8f9; font-weight: 700; }}
+            .ai_cursor {{ display: inline-block; color: #67e8f9; animation: ai_blink 1s step-start infinite; }}
             </style>
-            <div class="lp_card">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; position:relative; z-index:1;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span class="lp_icon_badge">🔬</span>
-                        <strong style="font-size: 18px; color: #38bdf8;">LitPhyto AI Pipeline Running...</strong>
+            <div class="ai_wrap">
+                <div class="ai_top_row">
+                    <div class="ai_orbit">
+                        <div class="ai_orbit_ring r1"></div>
+                        <div class="ai_orbit_ring r2"></div>
+                        <div class="ai_orbit_core">🧠</div>
                     </div>
-                    <span style="font-size: 13px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3);">
-                        Target: {target_virus} | Extract: {query_input} ({extract_part})
-                    </span>
+                    <div class="ai_title_block">
+                        <div class="ai_title">LitPhyto AI Pipeline Running</div>
+                        <div class="ai_subtitle">5-Stage Deep Antiviral &amp; Phytochemical Intelligence Analysis</div>
+                    </div>
+                </div>
+                <div class="ai_meta_row">
+                    <span class="ai_meta_pill">🧬 {query_input}</span>
+                    <span class="ai_meta_pill">🎯 Target: {target_virus}</span>
+                    <span class="ai_meta_pill">🌿 Part: {extract_part}</span>
                 </div>
             </div>
             """.format(target_virus=target_virus, query_input=query_input, extract_part=extract_part), unsafe_allow_html=True)
@@ -2325,11 +2165,11 @@ def main():
                 rows = rows + [current_text]
             html_rows = []
             for i, r in enumerate(rows):
-                cls = "lp_current" if (current_text and i == len(rows) - 1) else "lp_done"
-                cursor = ' <span class="lp_cursor">▌</span>' if (current_text and i == len(rows) - 1) else ""
-                html_rows.append(f'<div class="lp_console_line {cls}">{r}{cursor}</div>')
+                cls = "ai_current" if (current_text and i == len(rows) - 1) else "ai_done"
+                cursor = ' <span class="ai_cursor">▌</span>' if (current_text and i == len(rows) - 1) else ""
+                html_rows.append(f'<div class="ai_console_line {cls}">{r}{cursor}</div>')
             console_placeholder.markdown(
-                f'<div class="lp_console">{"".join(html_rows[-9:])}</div>',
+                f'<div class="ai_console">{"".join(html_rows[-9:])}</div>',
                 unsafe_allow_html=True
             )
 
@@ -2565,7 +2405,7 @@ def main():
             comp_efficacy = round(min(99.2, max(62.0, (abs(pa_aff) / 15.8) * 100.0)), 1)
             expander_header = f"Rank #{idx+1}: {c_name}  |  항바이러스 효능: {comp_efficacy}%  |  검증 레퍼런스: {n_citations}건"
 
-            with st.expander(expander_header, expanded=True if idx == 0 else False):
+            with st.expander(expander_header, expanded=False):
                 badge_col1, badge_col2 = st.columns(2)
 
                 with badge_col1:
@@ -2750,99 +2590,110 @@ def main():
         </div>
         """), unsafe_allow_html=True)
 
-        # --- LLM API & Local DB Engine Selector Panel (Always Visible, Clear Layout) ---
-        st.markdown("""
-        <div style="background:#ffffff; border:2px solid #a7f3d0; border-radius:14px; padding:20px; margin-bottom:20px; box-shadow:0 4px 16px rgba(0,0,0,0.04);">
-            <div style="font-size:16px; font-weight:800; color:#065f46; margin-bottom:14px; border-bottom:1.5px solid #a7f3d0; padding-bottom:8px;">
-                AI 모델 및 LLM API 엔진 설정 (Gemini / GPT / Claude / Bio-DB 선택)
+        # --- LLM API & Local DB Engine Selector Panel ---
+        # [버그 수정] 기존엔 <div>를 열고 별도 st.columns()/selectbox 위젯을 넣은 뒤
+        # </div>로 닫으려 했는데, Streamlit 위젯은 그 HTML 문자열 안에 실제로
+        # 포함되지 않아서 제목 텍스트만 박스 안에 있고 선택기/버튼은 박스 밖으로
+        # 빠져나와 있었음(스크린샷에서 확인된 그대로). st.container(border=True)로
+        # 전체를 진짜 하나의 박스에 담고, 다른 영역(초록)과 구분되도록 인디고/
+        # 보라 계열 강조색으로 바꿈.
+        with st.container(border=True):
+            st.markdown("""
+            <div style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%); margin:-1px -1px 18px -1px; padding:16px 22px; border-radius:9px 9px 0 0;">
+                <div style="font-size:16px; font-weight:800; color:#ffffff; display:flex; align-items:center; gap:8px;">
+                    <span>⚙️</span><span>AI 모델 및 LLM API 엔진 설정 (Gemini / GPT / Claude / Bio-DB 선택)</span>
+                </div>
             </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
 
-        engine_col, version_col = st.columns([1.2, 1.8])
+            engine_col, version_col = st.columns([1.2, 1.8])
 
-        with engine_col:
-            st.markdown("<div style='font-size:13px; font-weight:700; color:#0f172a; margin-bottom:6px;'>1. 연산 AI 엔진 선택:</div>", unsafe_allow_html=True)
-            llm_engine_choice = st.selectbox(
-                "추출법 연산 AI 엔진:",
-                options=["db", "gemini", "openai", "claude"],
-                format_func=lambda x: {
-                    "db": "식물 종별 문헌 DB 엔진 (Local Bio-Literature DB)",
-                    "gemini": "Google Gemini API (실시간 제미나이 연산)",
-                    "openai": "OpenAI GPT API (실시간 GPT 연산)",
-                    "claude": "Anthropic Claude API (실시간 클로드 연산)"
-                }[x],
-                index=0,
-                key="llm_engine_selectbox"
-            )
-
-        with version_col:
-            user_api_key_input = ""
-            selected_model_version = ""
-
-            if llm_engine_choice == "gemini":
-                st.markdown("""
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <span style="font-size:13px; font-weight:700; color:#0f172a;">2. Gemini 모델 버전 및 API Key:</span>
-                    <a href="https://aistudio.google.com/app/apikey" target="_blank"
-                       style="background:#f0fdf4; border:1.5px solid #059669; border-radius:6px; padding:4px 10px;
-                              color:#065f46; font-size:11.5px; font-weight:800; text-decoration:none;">
-                        Google AI Studio API Key 발급받기 ↗
-                    </a>
-                </div>
-                """, unsafe_allow_html=True)
-                selected_model_version = st.selectbox(
-                    "Gemini 모델 버전 선택:",
-                    options=["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"],
+            with engine_col:
+                st.markdown("<div style='font-size:13px; font-weight:700; color:#4338ca; margin-bottom:6px;'>1. 연산 AI 엔진 선택:</div>", unsafe_allow_html=True)
+                llm_engine_choice = st.selectbox(
+                    "추출법 연산 AI 엔진:",
+                    options=["db", "gemini", "openai", "claude"],
+                    format_func=lambda x: {
+                        "db": "식물 종별 문헌 DB 엔진 (Local Bio-Literature DB)",
+                        "gemini": "Google Gemini API (실시간 제미나이 연산)",
+                        "openai": "OpenAI GPT API (실시간 GPT 연산)",
+                        "claude": "Anthropic Claude API (실시간 클로드 연산)"
+                    }[x],
                     index=0,
-                    key="gemini_version_select"
+                    key="llm_engine_selectbox"
                 )
-                user_api_key_input = st.text_input("Google Gemini API Key 입력 (미입력 시 환경변수 적용):", type="password", key="gemini_key_input")
 
-            elif llm_engine_choice == "openai":
-                st.markdown("""
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <span style="font-size:13px; font-weight:700; color:#0f172a;">2. GPT 모델 버전 및 API Key:</span>
-                    <a href="https://platform.openai.com/api-keys" target="_blank"
-                       style="background:#f0fdf4; border:1.5px solid #059669; border-radius:6px; padding:4px 10px;
-                              color:#065f46; font-size:11.5px; font-weight:800; text-decoration:none;">
-                        OpenAI API Key 발급받기 ↗
-                    </a>
-                </div>
-                """, unsafe_allow_html=True)
-                selected_model_version = st.selectbox(
-                    "GPT 모델 버전 선택:",
-                    options=["gpt-4o", "gpt-4o-mini"],
-                    index=0,
-                    key="openai_version_select"
-                )
-                user_api_key_input = st.text_input("OpenAI API Key 입력 (미입력 시 환경변수 적용):", type="password", key="openai_key_input")
+            with version_col:
+                user_api_key_input = ""
+                selected_model_version = ""
 
-            elif llm_engine_choice == "claude":
-                st.markdown("""
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <span style="font-size:13px; font-weight:700; color:#0f172a;">2. Claude 모델 버전 및 API Key:</span>
-                    <a href="https://console.anthropic.com/settings/keys" target="_blank"
-                       style="background:#f0fdf4; border:1.5px solid #059669; border-radius:6px; padding:4px 10px;
-                              color:#065f46; font-size:11.5px; font-weight:800; text-decoration:none;">
-                        Anthropic Console API Key 발급받기 ↗
-                    </a>
-                </div>
-                """, unsafe_allow_html=True)
-                selected_model_version = st.selectbox(
-                    "Claude 모델 버전 선택:",
-                    options=["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5-20251001"],
-                    index=0,
-                    key="claude_version_select"
-                )
-                user_api_key_input = st.text_input("Anthropic Claude API Key 입력 (미입력 시 환경변수 적용):", type="password", key="claude_key_input")
+                if llm_engine_choice == "gemini":
+                    st.markdown("""
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <span style="font-size:13px; font-weight:700; color:#4338ca;">2. Gemini 모델 버전 및 API Key:</span>
+                        <a href="https://aistudio.google.com/app/apikey" target="_blank"
+                           style="background:#eef2ff; border:1.5px solid #6366f1; border-radius:6px; padding:4px 10px;
+                                  color:#4338ca; font-size:11.5px; font-weight:800; text-decoration:none;">
+                            Google AI Studio API Key 발급받기 ↗
+                        </a>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    selected_model_version = st.selectbox(
+                        "Gemini 모델 버전 선택:",
+                        options=["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"],
+                        index=0,
+                        key="gemini_version_select"
+                    )
+                    user_api_key_input = st.text_input("Google Gemini API Key 입력 (미입력 시 환경변수 적용):", type="password", key="gemini_key_input")
 
-            else:
-                st.markdown("<div style='font-size:13px; font-weight:700; color:#0f172a; margin-bottom:6px;'>2. 바이오 문헌 DB 엔진 상태:</div>", unsafe_allow_html=True)
-                st.info("식물 바이오 문헌 DB 엔진 사용 중 (별도 API 키 및 모델 선택이 필요하지 않습니다)")
+                elif llm_engine_choice == "openai":
+                    st.markdown("""
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <span style="font-size:13px; font-weight:700; color:#4338ca;">2. GPT 모델 버전 및 API Key:</span>
+                        <a href="https://platform.openai.com/api-keys" target="_blank"
+                           style="background:#eef2ff; border:1.5px solid #6366f1; border-radius:6px; padding:4px 10px;
+                                  color:#4338ca; font-size:11.5px; font-weight:800; text-decoration:none;">
+                            OpenAI API Key 발급받기 ↗
+                        </a>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    selected_model_version = st.selectbox(
+                        "GPT 모델 버전 선택:",
+                        options=["gpt-4o", "gpt-4o-mini"],
+                        index=0,
+                        key="openai_version_select"
+                    )
+                    user_api_key_input = st.text_input("OpenAI API Key 입력 (미입력 시 환경변수 적용):", type="password", key="openai_key_input")
 
-        st.markdown("</div>", unsafe_allow_html=True)
+                elif llm_engine_choice == "claude":
+                    st.markdown("""
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <span style="font-size:13px; font-weight:700; color:#4338ca;">2. Claude 모델 버전 및 API Key:</span>
+                        <a href="https://console.anthropic.com/settings/keys" target="_blank"
+                           style="background:#eef2ff; border:1.5px solid #6366f1; border-radius:6px; padding:4px 10px;
+                                  color:#4338ca; font-size:11.5px; font-weight:800; text-decoration:none;">
+                            Anthropic Console API Key 발급받기 ↗
+                        </a>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    selected_model_version = st.selectbox(
+                        "Claude 모델 버전 선택:",
+                        options=["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5-20251001"],
+                        index=0,
+                        key="claude_version_select"
+                    )
+                    user_api_key_input = st.text_input("Anthropic Claude API Key 입력 (미입력 시 환경변수 적용):", type="password", key="claude_key_input")
 
-        run_btn_clicked = st.button("▶ 선택된 AI 엔진으로 식물 추출 프로토콜 연산 실행", use_container_width=True, key="run_llm_btn")
+                else:
+                    st.markdown("<div style='font-size:13px; font-weight:700; color:#4338ca; margin-bottom:6px;'>2. 바이오 문헌 DB 엔진 상태:</div>", unsafe_allow_html=True)
+                    st.markdown(
+                        "<div style='background:#eef2ff; border:1.5px solid #c7d2fe; border-radius:8px; padding:12px 16px; color:#4338ca; font-size:14px;'>"
+                        "식물 바이오 문헌 DB 엔진 사용 중 (별도 API 키 및 모델 선택이 필요하지 않습니다)</div>",
+                        unsafe_allow_html=True
+                    )
+
+            st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
+            run_btn_clicked = st.button("▶ 선택된 AI 엔진으로 식물 추출 프로토콜 연산 실행", use_container_width=True, key="run_llm_btn")
 
         # Session state controlled execution - Runs ONLY when button is clicked or on initial load
         if "extraction_proposals" not in st.session_state or run_btn_clicked:
@@ -2903,101 +2754,110 @@ def main():
                 s_detail = step_obj.get('detail', '')
                 s_svg = step_obj.get('svg', '')
 
-                steps_timeline_html += f"""<div style="display:flex; gap:16px; margin-bottom:16px; align-items:stretch; background:#f8fafc; border:1.5px solid #e2e8f0; border-left:4px solid {pal['solid']}; border-radius:12px; padding:14px 18px; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
-<div style="width:110px; height:80px; flex-shrink:0; border-radius:8px; overflow:hidden; border:1px solid #cbd5e1; display:flex; align-items:center; justify-content:center; background:#ffffff;">
+                steps_timeline_html += f"""<div style="display:flex; gap:16px; margin-bottom:16px; align-items:stretch; background:#f8fafc; border:1.5px solid #e2e8f0; border-left:4px solid {pal['solid']}; border-radius:12px; padding:16px 20px; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+<div style="width:120px; height:88px; flex-shrink:0; border-radius:8px; overflow:hidden; border:1px solid #cbd5e1; display:flex; align-items:center; justify-content:center; background:#ffffff;">
 <img src="{s_svg}" style="width:100%; height:100%; object-fit:cover;" alt="{s_title}" />
 </div>
 <div style="flex:1;">
-<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-<span style="background:{pal['solid']}; color:#ffffff; font-weight:800; font-size:12px; padding:2px 10px; border-radius:12px;">STEP {s_num}</span>
-<span style="font-size:15px; font-weight:800; color:{pal['text']};">{s_title}</span>
+<div style="display:flex; align-items:center; gap:8px; margin-bottom:7px;">
+<span style="background:{pal['solid']}; color:#ffffff; font-weight:800; font-size:13px; padding:3px 11px; border-radius:12px;">STEP {s_num}</span>
+<span style="font-size:17px; font-weight:800; color:{pal['text']};">{s_title}</span>
 </div>
-<div style="font-size:13.5px; color:#1e293b; line-height:1.65; font-weight:500;">{s_detail}</div>
+<div style="font-size:15px; color:#1e293b; line-height:1.7; font-weight:500;">{s_detail}</div>
 </div>
 </div>"""
 
-            card_html = f"""<div style="background:#ffffff; border:2px solid {pal['border']}; border-top:6px solid {pal['solid']}; border-radius:18px; padding:24px; margin-bottom:28px; box-shadow:0 8px 30px rgba(0,0,0,0.07);">
+            # [수정] 카드와 다운로드 버튼을 진짜 하나의 박스 안에 배치하기 위해
+            # st.container(border=True)로 감쌈. 기존엔 카드(HTML)와 다운로드
+            # 버튼(Streamlit 위젯)이 서로 다른 블록이라 시각적으로 분리돼
+            # 보였음 - 이제 옵션 하나가 실제로 하나의 테두리 안에 들어감.
+            with st.container(border=True):
+                card_html = f"""<div style="background:linear-gradient(180deg,{pal['light']} 0%,#ffffff 60px); border-radius:8px 8px 0 0; margin:-1px -1px 0 -1px; padding:4px 4px 20px 4px;">
+<div style="height:6px; background:{pal['solid']}; border-radius:6px; margin-bottom:18px;"></div>
+<div style="padding:0 16px;">
 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
 <div style="display:flex; align-items:center; gap:12px;">
 <span style="background:{pal['solid']}; color:#ffffff; font-weight:800; font-size:14px; padding:6px 16px; border-radius:20px;">Option #{prop['rank']}</span>
-<span style="font-size:19px; font-weight:800; color:{pal['text']};">{prop['name']}</span>
+<span style="font-size:21px; font-weight:800; color:{pal['text']};">{prop['name']}</span>
 </div>
-<span style="background:{pal['light']}; color:{pal['text']}; font-weight:800; font-size:13.5px; padding:6px 14px; border-radius:10px; border:1.5px solid {pal['border']};">{prop['yield_boost']}</span>
+<span style="background:{pal['light']}; color:{pal['text']}; font-weight:800; font-size:14px; padding:6px 14px; border-radius:10px; border:1.5px solid {pal['border']};">{prop['yield_boost']}</span>
 </div>
 
-<div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; font-size:13.5px;">
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px;">
 <div style="background:{pal['light']}; border:1.5px solid {pal['border']}; padding:14px 16px; border-radius:12px;">
-<div style="color:{pal['text']}; font-weight:800; font-size:12px; margin-bottom:4px; letter-spacing:0.04em;">공정 제어 파라미터 (PROCESS CONTROL PARAMETERS)</div>
-<div style="color:#0f172a; font-weight:700; font-size:14px;">{prop['condition']}</div>
+<div style="color:{pal['text']}; font-weight:800; font-size:13px; margin-bottom:5px; letter-spacing:0.04em;">공정 제어 파라미터 (PROCESS CONTROL PARAMETERS)</div>
+<div style="color:#0f172a; font-weight:700; font-size:15.5px;">{prop['condition']}</div>
 </div>
 <div style="background:{pal['light']}; border:1.5px solid {pal['border']}; padding:14px 16px; border-radius:12px;">
-<div style="color:{pal['text']}; font-weight:800; font-size:12px; margin-bottom:4px; letter-spacing:0.04em;">타겟 유효 화학 성분 (TARGET PHYTOCHEMICAL CATEGORY)</div>
-<div style="color:#0f172a; font-weight:700; font-size:14px;">{prop['target_components']}</div>
+<div style="color:{pal['text']}; font-weight:800; font-size:13px; margin-bottom:5px; letter-spacing:0.04em;">타겟 유효 화학 성분 (TARGET PHYTOCHEMICAL CATEGORY)</div>
+<div style="color:#0f172a; font-weight:700; font-size:15.5px;">{prop['target_components']}</div>
 </div>
 </div>
 
 <div style="margin-bottom:20px;">
-<div style="font-size:16px; font-weight:800; color:{pal['text']}; margin-bottom:14px;">
-📋 단계별 정밀 공정 시각화 프로토콜 (Step-by-Step Visualized SOP Timeline)
+<div style="font-size:17px; font-weight:800; color:{pal['text']}; margin-bottom:14px;">
+📋 단계별 정밀 공정 시각화 프로토콜 (Step-by-Step Visualized SOP Timeline, 총 {len(prop['sop_steps'])}단계)
 </div>
 {steps_timeline_html}
 </div>
 
-<div style="background:{pal['light']}; border:1.5px solid {pal['border']}; border-left:5px solid {pal['solid']}; padding:14px 18px; border-radius:12px; font-size:14px; color:#1e293b; line-height:1.7; margin-bottom:20px;">
-<strong style="color:{pal['text']}; font-size:14.5px;">기술 메커니즘 근거 (Technical Rationale):</strong> {prop['rationale']}
+<div style="background:{pal['light']}; border:1.5px solid {pal['border']}; border-left:5px solid {pal['solid']}; padding:14px 18px; border-radius:12px; font-size:15.5px; color:#1e293b; line-height:1.75; margin-bottom:20px;">
+<strong style="color:{pal['text']}; font-size:15.5px;">기술 메커니즘 근거 (Technical Rationale):</strong> {prop['rationale']}
 </div>
 
 <div style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:12px; padding:16px 20px;">
-<div style="font-size:13px; font-weight:800; color:#334155; margin-bottom:10px;">
+<div style="font-size:13.5px; font-weight:800; color:#334155; margin-bottom:10px;">
 🔗 검증 학술 논문, 구글 학술검색 및 관련 특허 원문 검색:
 </div>
 <div style="display:flex; gap:12px; flex-wrap:wrap;">
-<a href="{paper_url}" target="_blank" style="background:#059669; color:#ffffff; font-weight:700; font-size:13px; padding:9px 18px; border-radius:8px; text-decoration:none; display:inline-block; box-shadow:0 2px 6px rgba(5,150,105,0.25);">📄 Direct PubMed Search ({paper_label}) ↗</a>
-<a href="{scholar_url}" target="_blank" style="background:#2563eb; color:#ffffff; font-weight:700; font-size:13px; padding:9px 18px; border-radius:8px; text-decoration:none; display:inline-block; box-shadow:0 2px 6px rgba(37,99,235,0.25);">🎓 Google Scholar Academic Search ↗</a>
-<a href="{patent_url}" target="_blank" style="background:#0284c7; color:#ffffff; font-weight:700; font-size:13px; padding:9px 18px; border-radius:8px; text-decoration:none; display:inline-block; box-shadow:0 2px 6px rgba(2,132,199,0.25);">📜 Direct Patent Claims Search ({patent_label}) ↗</a>
+<a href="{paper_url}" target="_blank" style="background:#059669; color:#ffffff; font-weight:700; font-size:13.5px; padding:9px 18px; border-radius:8px; text-decoration:none; display:inline-block; box-shadow:0 2px 6px rgba(5,150,105,0.25);">📄 Direct PubMed Search ({paper_label}) ↗</a>
+<a href="{scholar_url}" target="_blank" style="background:#2563eb; color:#ffffff; font-weight:700; font-size:13.5px; padding:9px 18px; border-radius:8px; text-decoration:none; display:inline-block; box-shadow:0 2px 6px rgba(37,99,235,0.25);">🎓 Google Scholar Academic Search ↗</a>
+<a href="{patent_url}" target="_blank" style="background:#0284c7; color:#ffffff; font-weight:700; font-size:13.5px; padding:9px 18px; border-radius:8px; text-decoration:none; display:inline-block; box-shadow:0 2px 6px rgba(2,132,199,0.25);">📜 Direct Patent Claims Search ({patent_label}) ↗</a>
+</div>
 </div>
 </div>
 </div>"""
 
-            st.markdown(textwrap.dedent(card_html), unsafe_allow_html=True)
+                st.markdown(textwrap.dedent(card_html), unsafe_allow_html=True)
 
-            # Compact right-aligned PDF Download button (Explicitly stating Option number)
-            # [수정] reportlab 임포트/생성 실패가 앱 전체를 죽이지 않도록 방어적으로 감쌈
-            # (requirements.txt에 reportlab이 빠져 있어서 이 부분이 통째로 앱을
-            # 죽이고 있었음 - 지금은 requirements.txt에 추가했지만, 혹시 모를
-            # 다른 예외 상황에도 이 옵션만 다운로드 버튼이 빠지고 나머지는
-            # 정상 동작하도록 함).
-            try:
-                single_pdf_bytes = generate_single_protocol_pdf_bytes(
-                    prop,
-                    result.get('query_resource', 'Plant'),
-                    result.get('extract_part', 'Leaves')
-                )
-            except Exception as e:
-                single_pdf_bytes = None
-                st.warning(f"⚠️ [Option #{prop.get('rank', 1)}] PDF 생성 실패: {e}")
-
-            if single_pdf_bytes:
-                # [수정] 아이콘을 텍스트 속 이모지가 아니라 옵션 색상 그라디언트
-                # 배지로 만들고, 제목/부제 위계를 나눠서 좀 더 정돈된 다운로드
-                # 카드 형태로 바꿈.
-                dl_icon_col, dl_text_col, dl_btn_col = st.columns([0.5, 3.3, 1.7])
-                with dl_icon_col:
-                    st.markdown(f"""<div style="width:42px; height:42px; border-radius:12px; background:linear-gradient(135deg, {pal['solid']} 0%, {pal['text']} 100%); display:flex; align-items:center; justify-content:center; font-size:19px; box-shadow:0 3px 10px rgba(0,0,0,0.18); margin-top:2px;">📄</div>""", unsafe_allow_html=True)
-                with dl_text_col:
-                    st.markdown(f"""<div style="padding-top:3px;">
-                        <div style="font-weight:800; font-size:13.5px; color:{pal['text']};">Option #{prop.get('rank', 1)} 표준 공정 리포트</div>
-                        <div style="font-size:11.5px; color:#64748b; margin-top:1px;">PDF 형식 · 이 옵션만 단독 저장</div>
-                    </div>""", unsafe_allow_html=True)
-                with dl_btn_col:
-                    st.download_button(
-                        label="⬇ 다운로드",
-                        data=single_pdf_bytes,
-                        file_name=f"{result.get('query_resource')}_Option_{prop.get('rank', 1)}_추출프로토콜.pdf",
-                        mime="application/pdf",
-                        key=f"dl_single_pdf_{prop.get('rank', 1)}",
-                        use_container_width=True
+                # Compact right-aligned PDF Download button (Explicitly stating Option number)
+                # [수정] reportlab 임포트/생성 실패가 앱 전체를 죽이지 않도록 방어적으로 감쌈
+                # (requirements.txt에 reportlab이 빠져 있어서 이 부분이 통째로 앱을
+                # 죽이고 있었음 - 지금은 requirements.txt에 추가했지만, 혹시 모를
+                # 다른 예외 상황에도 이 옵션만 다운로드 버튼이 빠지고 나머지는
+                # 정상 동작하도록 함).
+                try:
+                    single_pdf_bytes = generate_single_protocol_pdf_bytes(
+                        prop,
+                        result.get('query_resource', 'Plant'),
+                        result.get('extract_part', 'Leaves'),
+                        accent_hex=pal['solid']
                     )
+                except Exception as e:
+                    single_pdf_bytes = None
+                    st.warning(f"⚠️ [Option #{prop.get('rank', 1)}] PDF 생성 실패: {e}")
+
+                if single_pdf_bytes:
+                    # [수정] 아이콘을 텍스트 속 이모지가 아니라 옵션 색상 그라디언트
+                    # 배지로 만들고, 제목/부제 위계를 나눠서 좀 더 정돈된 다운로드
+                    # 카드 형태로 바꿈.
+                    dl_icon_col, dl_text_col, dl_btn_col = st.columns([0.5, 3.3, 1.7])
+                    with dl_icon_col:
+                        st.markdown(f"""<div style="width:42px; height:42px; border-radius:12px; background:linear-gradient(135deg, {pal['solid']} 0%, {pal['text']} 100%); display:flex; align-items:center; justify-content:center; font-size:19px; box-shadow:0 3px 10px rgba(0,0,0,0.18); margin-top:2px;">📄</div>""", unsafe_allow_html=True)
+                    with dl_text_col:
+                        st.markdown(f"""<div style="padding-top:3px;">
+                            <div style="font-weight:800; font-size:13.5px; color:{pal['text']};">Option #{prop.get('rank', 1)} 표준 공정 리포트</div>
+                            <div style="font-size:11.5px; color:#64748b; margin-top:1px;">PDF 형식 · 이 옵션만 단독 저장</div>
+                        </div>""", unsafe_allow_html=True)
+                    with dl_btn_col:
+                        st.download_button(
+                            label="⬇ 다운로드",
+                            data=single_pdf_bytes,
+                            file_name=f"{result.get('query_resource')}_Option_{prop.get('rank', 1)}_추출프로토콜.pdf",
+                            mime="application/pdf",
+                            key=f"dl_single_pdf_{prop.get('rank', 1)}",
+                            use_container_width=True
+                        )
             st.markdown("<div style='margin-bottom:24px;'></div>", unsafe_allow_html=True)
 
     # Tab 4: Patent Search (특허 검색) - '글로벌' 단어 삭제!
@@ -3068,11 +2928,8 @@ def main():
 
             lead_db_urls = get_patent_database_urls(lname)
 
-            card_pills_html = f"""<div style="background:linear-gradient(135deg,{_bg} 0%,#ffffff 100%); border:2.5px solid {_bd}; border-radius:14px; padding:16px; margin-bottom:12px; box-shadow:0 4px 18px rgba(0,0,0,0.07);">
-<div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-<div style="background:{_badge}; color:#fff; font-size:12px; font-weight:800; padding:4px 14px; border-radius:20px;">Rank #{pidx+1}</div>
-<div style="font-size:16px; font-weight:800; color:{_tx};">{lname}</div>
-<div style="margin-left:auto; font-size:11px; color:#64748b; font-weight:600;">검색된 특허 DB {len(patents)}건</div>
+            card_pills_html = f"""<div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+<div style="margin-left:auto; font-size:11px; color:#64748b; font-weight:600;"></div>
 </div>
 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
 <a href="{lead_db_urls['google']}" target="_blank" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:5px 12px; color:#1e293b; font-size:11.5px; font-weight:700; text-decoration:none;">Google Patents ↗</a>
@@ -3080,15 +2937,16 @@ def main():
 <a href="{lead_db_urls['kipris']}" target="_blank" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:5px 12px; color:#1e293b; font-size:11.5px; font-weight:700; text-decoration:none;">KIPRIS (특허청) ↗</a>
 <a href="{lead_db_urls['uspto']}" target="_blank" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:5px 12px; color:#1e293b; font-size:11.5px; font-weight:700; text-decoration:none;">USPTO PPUBS ↗</a>
 <a href="{lead_db_urls['patentscope']}" target="_blank" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:5px 12px; color:#1e293b; font-size:11.5px; font-weight:700; text-decoration:none;">PATENTSCOPE (WIPO) ↗</a>
-</div>
 </div>"""
-            st.markdown(card_pills_html, unsafe_allow_html=True)
+            # [수정] 카드를 항상 펼쳐서 보여주던 것을, 기본 닫힌 expander로 감쌈
+            with st.expander(f"Rank #{pidx+1}: {lname} | 검색된 특허 DB {len(patents)}건", expanded=False):
+                st.markdown(card_pills_html, unsafe_allow_html=True)
 
-            for pi, pat in enumerate(patents):
-                pat_bg = "#f8fafc" if pi % 2 == 0 else "#ffffff"
-                src_db_name = pat.get("source_db", "Google Patents")
+                for pi, pat in enumerate(patents):
+                    pat_bg = "#f8fafc" if pi % 2 == 0 else "#ffffff"
+                    src_db_name = pat.get("source_db", "Google Patents")
 
-                pat_item_html = f"""<div style="background:{pat_bg}; border:1.5px solid {_bd}40; border-left:4px solid {_badge}; border-radius:10px; padding:14px 18px; margin-bottom:10px; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                    pat_item_html = f"""<div style="background:{pat_bg}; border:1.5px solid {_bd}40; border-left:4px solid {_badge}; border-radius:10px; padding:14px 18px; margin-bottom:10px; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
 <div>
 <span style="background:{_badge}22; color:{_tx}; font-size:11px; font-weight:800; padding:2px 8px; border-radius:6px; border:1px solid {_bd}; margin-right:8px;">{pat['patent_id']}</span>
@@ -3100,7 +2958,7 @@ def main():
 <div style="font-size:11.5px; color:#475569; margin-bottom:10px; background:#f1f5f9; padding:8px 10px; border-radius:6px; line-height:1.5;">{pat['summary']}</div>
 <a href="{pat['url']}" target="_blank" style="display:inline-flex; align-items:center; gap:6px; background:{_badge}; color:#ffffff; font-weight:700; font-size:11.5px; padding:6px 14px; border-radius:8px; text-decoration:none;">Open {src_db_name} Direct Search ↗</a>
 </div>"""
-                st.markdown(pat_item_html, unsafe_allow_html=True)
+                    st.markdown(pat_item_html, unsafe_allow_html=True)
 
         if 'all_patents_for_export' not in st.session_state:
             st.session_state['all_patents_for_export'] = []
