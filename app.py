@@ -1162,6 +1162,89 @@ def generate_extraction_method_proposals(query_resource: str, extract_part: str)
 
 
 
+def render_annotated_h1n1_diagram_bytes(leads: list) -> bytes:
+    """
+    [신규] MOA Pathway Diagram 탭에서 화면에 보여주는 "Rank 배지가 얹힌 H1N1
+    다이어그램"을 PDF에도 그대로 가져오기 위한 함수. 화면은 HTML/CSS 오버레이라
+    PDF에 그대로 못 옮기므로, PIL로 원본 이미지 위에 실제 배지(색상·순위·
+    화합물명)를 직접 합성해서 진짜 이미지 파일로 만듦.
+
+    좌표(pin_x, pin_y)와 색상(LEAD_COLORS)은 MOA Pathway Diagram 탭의
+    STAGE_MAP과 동일한 값을 그대로 재사용해서 화면과 동일한 위치에 배지가
+    찍히도록 함.
+    """
+    import os
+    from PIL import Image as PILImage, ImageDraw, ImageFont
+    import io as _io
+
+    img_path = "static/h1n1_lifecycle_diagram_clean.png"
+    if not os.path.exists(img_path):
+        img_path = "static/h1n1_lifecycle_diagram_notitle.png"
+    if not os.path.exists(img_path):
+        img_path = "static/h1n1_lifecycle_diagram.png"
+    if not os.path.exists(img_path):
+        return b""
+
+    base_img = PILImage.open(img_path).convert("RGBA")
+    W, H = base_img.size
+    overlay = PILImage.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    LEAD_COLORS_RGB = [
+        (220, 38, 38), (2, 132, 199), (5, 150, 105), (217, 119, 6), (192, 38, 212), (225, 29, 72),
+    ]
+    PIN_POSITIONS = [
+        (10, 46), (28, 74), (55, 52), (70, 72), (82, 14), (10, 46),
+    ]
+
+    font = None
+    for fpath in (
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    ):
+        if os.path.exists(fpath):
+            try:
+                font = ImageFont.truetype(fpath, size=max(14, int(W * 0.016)))
+                break
+            except Exception:
+                continue
+    if font is None:
+        font = ImageFont.load_default()
+
+    n_leads = len(leads) if leads else 0
+    n_pins = min(max(n_leads, 4), len(PIN_POSITIONS))
+
+    for i in range(n_pins):
+        lead = leads[i] if i < len(leads) else None
+        name = lead.get("compound_name", f"Lead #{i+1}") if lead else f"Lead #{i+1}"
+        label = f"Rank #{i+1}: {name}"
+        color = LEAD_COLORS_RGB[i % len(LEAD_COLORS_RGB)]
+        px_pct, py_pct = PIN_POSITIONS[i % len(PIN_POSITIONS)]
+        cx, cy = int(W * px_pct / 100), int(H * py_pct / 100)
+
+        try:
+            bbox = draw.textbbox((0, 0), label, font=font)
+            text_w, text_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        except Exception:
+            text_w, text_h = len(label) * 8, 14
+
+        pad_x, pad_y = 14, 8
+        badge_w, badge_h = text_w + pad_x * 2, text_h + pad_y * 2
+        x0, y0 = cx - badge_w // 2, cy - badge_h // 2
+        x1, y1 = x0 + badge_w, y0 + badge_h
+
+        draw.rounded_rectangle(
+            [x0, y0, x1, y1], radius=badge_h // 2,
+            fill=(*color, 235), outline=(255, 255, 255, 255), width=3
+        )
+        draw.text((x0 + pad_x, y0 + pad_y - bbox[1]), label, font=font, fill=(255, 255, 255, 255))
+
+    composed = PILImage.alpha_composite(base_img, overlay).convert("RGB")
+    buf = _io.BytesIO()
+    composed.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 def generate_full_report_pdf_bytes(
     result: dict, summary: dict, leads: list, moa: dict, perf: dict,
     patent_rows: list, citations_to_export: list
@@ -1223,6 +1306,22 @@ def generate_full_report_pdf_bytes(
     q_virus = result.get('target_virus', 'H1N1')
     gen_date = datetime.now().strftime("%Y-%m-%d %H:%M")
 
+    # [수정] "박스가 너무 두껍고 진하다"는 피드백에 따라, 색을 꽉 채운 진한
+    # 배너 대신 옅은 배경 + 좌측 액센트 바 + 진한 텍스트로 가볍게 통일함.
+    # 모든 섹션 헤더가 이 헬퍼를 공유해서 톤이 일관되게 함.
+    def _section_header(text, accent_hex, light_hex):
+        tbl = Table(
+            [[Paragraph(f"<b>{text}</b>", ParagraphStyle('SH', parent=styles['Normal'], fontName=font_name, fontSize=12.5, leading=16, textColor=colors.HexColor(accent_hex)))]],
+            colWidths=[519]
+        )
+        tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(light_hex)),
+            ('LINEBEFORE', (0, 0), (0, -1), 3, colors.HexColor(accent_hex)),
+            ('TOPPADDING', (0, 0), (-1, -1), 7), ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+            ('LEFTPADDING', (0, 0), (-1, -1), 12),
+        ]))
+        return tbl
+
     # ── 표지 헤더 ─────────────────────────────────────────────────────
     header_tbl = Table(
         [[Paragraph("LitPhyto-PanInfluenza Engine", title_style)],
@@ -1244,8 +1343,44 @@ def generate_full_report_pdf_bytes(
     ))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e2e8f0'), spaceBefore=8, spaceAfter=10))
 
+    # [신규] "유효물질들을 핵심으로 보여주게 잘 구성해봐" 요청에 따라, 표지
+    # 바로 다음에 전체 유효물질을 한눈에 보는 요약 카드를 추가함. 상세 정보
+    # (구조/부위비율/레퍼런스)는 뒤쪽 Lead Candidates 섹션에서 이어짐.
+    if leads:
+        glance_header = _section_header("핵심 유효물질 한눈에 보기 (Key Active Compounds at a Glance)", '#0f172a', '#f1f5f9')
+        story.append(glance_header)
+        story.append(Spacer(1, 6))
+        RANK_COLOR_HEX = ['#dc2626', '#2563eb', '#059669', '#d97706', '#c026d3', '#e11d48']
+        glance_rows = [[
+            Paragraph("<b>Rank</b>", small_style), Paragraph("<b>화합물</b>", small_style),
+            Paragraph("<b>화학 분류</b>", small_style), Paragraph("<b>PA 결합에너지</b>", small_style),
+            Paragraph("<b>수율 추정</b>", small_style)
+        ]]
+        for idx, lead in enumerate(leads):
+            rc = RANK_COLOR_HEX[idx % len(RANK_COLOR_HEX)]
+            glance_rows.append([
+                Paragraph(f"<font color='{rc}'><b>#{idx+1}</b></font>", small_style),
+                Paragraph(f"<b>{lead.get('compound_name','')}</b>", body_style),
+                Paragraph(', '.join(lead.get('chemical_classes', [])), small_style),
+                Paragraph(f"{lead.get('h1n1_pa_binding_affinity_kcal_mol','')} kcal/mol", small_style),
+                Paragraph(f"{round(lead.get('ratio_estimate', 0.2) * 100, 1)}%", small_style),
+            ])
+        glance_table = Table(glance_rows, colWidths=[38, 150, 145, 100, 86])
+        glance_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e2e8f0')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fafafa')]),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#e2e8f0')),
+            ('BOX', (0, 0), (-1, -1), 0.6, colors.HexColor('#cbd5e1')),
+            ('PADDING', (0, 0), (-1, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        story.append(glance_table)
+        story.append(Spacer(1, 16))
+
+
     # ── Overview Metrics & Benchmark Percentile Comparisons (전문 포함) ──
-    story.append(Paragraph("Overview Metrics &amp; Benchmark Percentile Comparisons", h1_style))
+    ov_header = _section_header("Overview Metrics &amp; Benchmark Percentile Comparisons", '#4338ca', '#eef2ff')
+    story.append(ov_header)
     top_lead = leads[0] if leads else {}
     top_lead_pa = top_lead.get("h1n1_pa_binding_affinity_kcal_mol", 0.0)
     synergy_val = moa.get('synergy_score', 0.0)
@@ -1285,7 +1420,8 @@ def generate_full_report_pdf_bytes(
     story.append(overview_table)
 
     # ── Quantitative Performance & Antiviral Potential Dashboard (전문 포함) ──
-    story.append(Paragraph("Quantitative Performance &amp; Antiviral Potential Dashboard", h1_style))
+    dash_header = _section_header("Quantitative Performance &amp; Antiviral Potential Dashboard", '#059669', '#ecfdf5')
+    story.append(dash_header)
     dash_data = [
         [Paragraph("<b>Extracted Yield Estimate (수율)</b>", body_style),
          Paragraph(f"{perf.get('yield_estimate_pct')}%", metric_val_style),
@@ -1318,22 +1454,40 @@ def generate_full_report_pdf_bytes(
 
     story.append(PageBreak())
 
-    # ── H1N1 생애주기 다이어그램 ─────────────────────────────────────
-    story.append(Paragraph("H1N1 바이러스 생애주기 다이어그램 및 유효물질 억제 위치 매핑", h1_style))
-    h1n1_path = None
-    for fname in ("h1n1_lifecycle_diagram_clean.png", "h1n1_lifecycle_diagram_notitle.png", "h1n1_lifecycle_diagram.png"):
-        candidate = f"static/{fname}"
-        if os.path.exists(candidate):
-            h1n1_path = candidate
-            break
-    if h1n1_path:
+    # ── H1N1 생애주기 다이어그램 (Rank 배지 합성 버전) ──────────────
+    h1n1_header = _section_header("H1N1 바이러스 생애주기 다이어그램 및 유효물질 억제 위치 매핑", '#0369a1', '#f0f9ff')
+    story.append(h1n1_header)
+    story.append(Spacer(1, 8))
+    # [수정] 기존엔 배지 없는 원본 이미지만 들어가 있었음. MOA Pathway Diagram
+    # 탭이 화면에 보여주는 "Rank 배지가 얹힌 버전"을 PIL로 실제 합성해서
+    # PDF에도 그대로 가져옴 (첨부 스크린샷과 동일한 형태).
+    annotated_img_bytes = None
+    try:
+        annotated_img_bytes = render_annotated_h1n1_diagram_bytes(leads)
+    except Exception:
+        annotated_img_bytes = None
+
+    if annotated_img_bytes:
         try:
-            img = Image(h1n1_path, width=519, height=519 * 0.49)
+            img = Image(io.BytesIO(annotated_img_bytes), width=519, height=519 * 0.49)
             story.append(img)
         except Exception:
             story.append(Paragraph("(H1N1 다이어그램 이미지를 불러오지 못했습니다)", small_style))
     else:
-        story.append(Paragraph("(H1N1 다이어그램 이미지 파일을 찾을 수 없습니다)", small_style))
+        h1n1_path = None
+        for fname in ("h1n1_lifecycle_diagram_clean.png", "h1n1_lifecycle_diagram_notitle.png", "h1n1_lifecycle_diagram.png"):
+            candidate = f"static/{fname}"
+            if os.path.exists(candidate):
+                h1n1_path = candidate
+                break
+        if h1n1_path:
+            try:
+                img = Image(h1n1_path, width=519, height=519 * 0.49)
+                story.append(img)
+            except Exception:
+                story.append(Paragraph("(H1N1 다이어그램 이미지를 불러오지 못했습니다)", small_style))
+        else:
+            story.append(Paragraph("(H1N1 다이어그램 이미지 파일을 찾을 수 없습니다)", small_style))
     story.append(Spacer(1, 4))
     story.append(Paragraph(
         f"Attachment & Entry → Uncoating & Fusion → vRNP Release & Nuclear Import → Replication & Transcription → "
@@ -1380,7 +1534,9 @@ def generate_full_report_pdf_bytes(
     story.append(PageBreak())
 
     # ── Lead Compounds (2D 구조 이미지 + 부위별 함유비율 + 개별 레퍼런스 포함) ──
-    story.append(Paragraph(f"Antiviral Lead Candidates ({len(leads)}개 화합물)", h1_style))
+    lead_header = _section_header(f"Antiviral Lead Candidates — 핵심 유효물질 ({len(leads)}개 화합물)", '#0f172a', '#f1f5f9')
+    story.append(lead_header)
+    story.append(Spacer(1, 8))
     for idx, lead in enumerate(leads):
         name = lead.get("compound_name", f"Lead #{idx+1}")
         smiles = lead.get("smiles", "")
@@ -1453,7 +1609,7 @@ def generate_full_report_pdf_bytes(
 
     story.append(PageBreak())
 
-    # ── 추출법 제안 (신규) ──────────────────────────────────────────
+    # ── 추출법 제안 (카드형 디자인) ──────────────────────────────────
     # [신규] "추출법도 함께 나와야지"라는 요청에 따라 Extraction Proposals 탭의
     # 내용을 PDF에도 포함시킴. 함수 내부에서 직접 생성하므로 호출자가 별도로
     # 준비하지 않아도 항상 포함됨 ("엄격히 모든 결과를 한번에 다운로드" 요청 반영).
@@ -1462,47 +1618,116 @@ def generate_full_report_pdf_bytes(
     except Exception:
         extraction_options = []
 
-    story.append(Paragraph("Optimal Plant Extraction Method Proposals (최적 식물 추출법 제안)", h1_style))
+    # [수정] "글만 늘어놓은 느낌" 피드백에 따라 각 옵션을 색상 헤더 배너 +
+    # 박스형 카드로 재디자인함. 화면(Extraction Proposals 탭)과 동일한
+    # 빨강/파랑/초록 팔레트를 그대로 재사용해서 일관성을 줌.
+    OPTION_COLOR_HEX = ['#dc2626', '#2563eb', '#059669', '#d97706', '#c026d3']
+    OPTION_COLORS = [colors.HexColor(h) for h in OPTION_COLOR_HEX]
+    OPTION_LIGHT = [
+        colors.HexColor('#fef2f2'), colors.HexColor('#eff6ff'), colors.HexColor('#ecfdf5'),
+        colors.HexColor('#fffbeb'), colors.HexColor('#fdf4ff'),
+    ]
+
+    ext_header = _section_header("Optimal Plant Extraction Method Proposals (최적 식물 추출법 제안)", '#0f172a', '#f1f5f9')
+    story.append(ext_header)
+    story.append(Spacer(1, 8))
     if extraction_options:
-        for opt in extraction_options:
-            opt_flowables = [
-                Paragraph(f"<b>Option #{opt.get('rank')}: {opt.get('name')}</b>", h2_style),
-                Paragraph(
-                    f"공정 조건: {opt.get('condition')}<br/>"
-                    f"타깃 성분: {opt.get('target_components')}<br/>"
-                    f"수율/효율: {opt.get('yield_boost')}",
-                    body_style
-                ),
-                Spacer(1, 3),
+        for oi, opt in enumerate(extraction_options):
+            accent = OPTION_COLORS[oi % len(OPTION_COLORS)]
+            accent_hex = OPTION_COLOR_HEX[oi % len(OPTION_COLOR_HEX)]
+            light = OPTION_LIGHT[oi % len(OPTION_LIGHT)]
+
+            # [수정] "박스가 너무 두껍고 진하다"는 피드백에 따라, 헤더를 진한
+            # 원색 꽉 채움 대신 옅은 배경 + 원색 텍스트/좌측 액센트 바로
+            # 가볍게 바꿈. 가독성 우선.
+            opt_header = Table(
+                [[Paragraph(f"<b>Option #{opt.get('rank')}</b>", ParagraphStyle('OH', parent=subtitle_style, fontSize=10, textColor=accent)),
+                  Paragraph(f"<b>{opt.get('name')}</b>", ParagraphStyle('OH2', parent=subtitle_style, fontSize=10.5, textColor=colors.HexColor('#1e293b')))]],
+                colWidths=[60, 459]
+            )
+            opt_header.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), light),
+                ('LINEABOVE', (0, 0), (-1, 0), 2, accent),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('PADDING', (0, 0), (-1, -1), 8),
+            ]))
+
+            meta_rows = [
+                [Paragraph("<b>공정 조건</b>", small_style), Paragraph(opt.get('condition', ''), body_style)],
+                [Paragraph("<b>타깃 성분</b>", small_style), Paragraph(opt.get('target_components', ''), body_style)],
+                [Paragraph("<b>수율/효율</b>", small_style), Paragraph(opt.get('yield_boost', ''), body_style)],
             ]
+            opt_meta = Table(meta_rows, colWidths=[65, 454])
+            opt_meta.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+                ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#e2e8f0')),
+                ('LINEBEFORE', (0, 0), (0, -1), 2.5, accent),
+                ('PADDING', (0, 0), (-1, -1), 7),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ]))
+
+            block_flowables = [opt_header, opt_meta, Spacer(1, 4)]
+
+            # [수정] "너무 간단하다"는 피드백에 따라, SOP 단계를 제목만 화살표로
+            # 이어붙이던 것에서 각 단계의 상세 설명(detail)까지 전부 보여주는
+            # 방식으로 확장함 (Option 단독 PDF와 동일한 상세도).
             sop_steps = opt.get("sop_steps", [])
             if sop_steps:
-                step_lines = [f"{s.get('step_num')}. {s.get('title')}" for s in sop_steps]
-                opt_flowables.append(Paragraph(
-                    f"<font size=8 color='#64748b'><b>SOP 단계 ({len(sop_steps)}단계)</b>: " + " → ".join(step_lines) + "</font>",
+                block_flowables.append(Paragraph(
+                    f"<font size=8.5 color='#475569'><b>SOP 상세 절차 ({len(sop_steps)}단계)</b></font>",
                     small_style
                 ))
-            opt_flowables.append(Spacer(1, 10))
-            story.append(KeepTogether(opt_flowables))
+                block_flowables.append(Spacer(1, 3))
+                sop_rows = []
+                for s in sop_steps:
+                    sop_rows.append([
+                        Paragraph(f"<font color='{accent_hex}'><b>{s.get('step_num')}</b></font>", small_style),
+                        Paragraph(f"<b>{s.get('title', '')}</b><br/>{s.get('detail', '')}", ParagraphStyle('SOPD', parent=body_style, fontSize=8.5, leading=12))
+                    ])
+                sop_table = Table(sop_rows, colWidths=[26, 493])
+                sop_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+                    ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.HexColor('#fafafa')]),
+                    ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#eef0f2')),
+                    ('LINEBEFORE', (0, 0), (0, -1), 2.5, accent),
+                    ('PADDING', (0, 0), (-1, -1), 6),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ]))
+                block_flowables.append(sop_table)
+
+            block_flowables.append(Spacer(1, 14))
+            story.append(KeepTogether(block_flowables[:3]))
+            for extra in block_flowables[3:]:
+                story.append(extra)
     else:
         story.append(Paragraph("(추출법 제안을 생성하지 못했습니다)", small_style))
 
     story.append(PageBreak())
 
-    # ── MOA ──────────────────────────────────────────────────────────
-    story.append(Paragraph("Mechanism of Action (MOA)", h1_style))
-    story.append(Paragraph(f"<b>{moa.get('moa_title', '')}</b>", h2_style))
-    story.append(Paragraph(moa.get('description', ''), body_style))
-    story.append(Spacer(1, 4))
-    story.append(Paragraph(
-        f"Bliss Synergy: {moa.get('synergy_score')} &nbsp;|&nbsp; "
-        f"Confidence: {moa.get('confidence_level')} &nbsp;|&nbsp; "
-        f"Broad-Spectrum Targets: {', '.join(moa.get('broad_spectrum_potential', []))}",
-        small_style
-    ))
+    # ── MOA (카드형 디자인) ───────────────────────────────────────────
+    moa_header = _section_header("Mechanism of Action (MOA)", '#4338ca', '#eef2ff')
+    story.append(moa_header)
+    moa_body = Table(
+        [[Paragraph(
+            f"<b>{moa.get('moa_title', '')}</b><br/><br/>{moa.get('description', '')}<br/><br/>"
+            f"<font color='#4338ca'><b>Bliss Synergy:</b></font> {moa.get('synergy_score')} &nbsp;|&nbsp; "
+            f"<font color='#4338ca'><b>Confidence:</b></font> {moa.get('confidence_level')} &nbsp;|&nbsp; "
+            f"<font color='#4338ca'><b>Broad-Spectrum Targets:</b></font> {', '.join(moa.get('broad_spectrum_potential', []))}",
+            body_style
+        )]],
+        colWidths=[519]
+    )
+    moa_body.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+        ('BOX', (0, 0), (-1, -1), 0.6, colors.HexColor('#e2e8f0')),
+        ('PADDING', (0, 0), (-1, -1), 12),
+    ]))
+    story.append(moa_body)
+    story.append(Spacer(1, 16))
 
-    # ── 참고문헌 ─────────────────────────────────────────────────────
-    story.append(Paragraph(f"PubMed Literature References (상위 {min(20, len(citations_to_export))}건)", h1_style))
+    # ── 참고문헌 (카드형 디자인) ──────────────────────────────────────
+    ref_header = _section_header(f"PubMed Literature References (상위 {min(20, len(citations_to_export))}건)", '#0f172a', '#f1f5f9')
+    story.append(ref_header)
     ref_rows = [[Paragraph("<b>#</b>", small_style), Paragraph("<b>Title</b>", small_style), Paragraph("<b>Evidence</b>", small_style)]]
     for idx, c in enumerate(citations_to_export[:20]):
         p_title_en = ensure_english_paper_title(c.get("title", ""), idx + 1)
@@ -1514,20 +1739,26 @@ def generate_full_report_pdf_bytes(
     if len(ref_rows) > 1:
         ref_table = Table(ref_rows, colWidths=[20, 260, 239])
         ref_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f1f5f9')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e2e8f0')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+            ('BOX', (0, 0), (-1, -1), 0.6, colors.HexColor('#cbd5e1')),
             ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#e2e8f0')),
-            ('PADDING', (0, 0), (-1, -1), 5),
+            ('PADDING', (0, 0), (-1, -1), 6),
         ]))
         story.append(ref_table)
     else:
         story.append(Paragraph("(참고문헌 없음)", small_style))
 
-    # ── 특허 검색 결과 ────────────────────────────────────────────────
-    story.append(Paragraph("관련 특허 검색 결과", h1_style))
+    story.append(Spacer(1, 16))
+
+    # ── 특허 검색 결과 (카드형 디자인) ────────────────────────────────
+    pat_header = _section_header("관련 특허 검색 결과", '#0f172a', '#f1f5f9')
+    story.append(pat_header)
     if patent_rows:
         pat_rows_html = [[Paragraph("<b>화합물</b>", small_style), Paragraph("<b>구분</b>", small_style), Paragraph("<b>제목</b>", small_style), Paragraph("<b>출원인/연도</b>", small_style)]]
         for p in patent_rows[:30]:
-            verified_tag = "검증됨" if p.get("verified") else "검색링크"
+            is_verified = p.get("verified")
+            verified_tag = f"<font color='#059669'><b>검증됨</b></font>" if is_verified else f"<font color='#d97706'><b>검색링크</b></font>"
             pat_rows_html.append([
                 Paragraph(p.get("compound_name", ""), small_style),
                 Paragraph(verified_tag, small_style),
@@ -1536,17 +1767,28 @@ def generate_full_report_pdf_bytes(
             ])
         pat_table = Table(pat_rows_html, colWidths=[80, 55, 260, 124])
         pat_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f1f5f9')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e2e8f0')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+            ('BOX', (0, 0), (-1, -1), 0.6, colors.HexColor('#cbd5e1')),
             ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#e2e8f0')),
-            ('PADDING', (0, 0), (-1, -1), 5),
+            ('PADDING', (0, 0), (-1, -1), 6),
         ]))
         story.append(pat_table)
-        story.append(Spacer(1, 4))
-        story.append(Paragraph(
-            "검색링크로 표시된 항목은 실제 특허가 아니라 해당 데이터베이스 검색 페이지로 연결되는 링크입니다. "
-            "Patent Search 탭에서 USPTO API 키를 입력하면 실제 검증된 특허 데이터를 확인할 수 있습니다.",
-            ParagraphStyle('WARN2', parent=small_style, textColor=colors.HexColor('#92400e'))
-        ))
+        story.append(Spacer(1, 6))
+        note_box = Table(
+            [[Paragraph(
+                "검색링크로 표시된 항목은 실제 특허가 아니라 해당 데이터베이스 검색 페이지로 연결되는 링크입니다. "
+                "Patent Search 탭에서 KIPRIS Plus 또는 USPTO API 키를 입력하면 실제 검증된 특허 데이터를 확인할 수 있습니다.",
+                ParagraphStyle('WARN2', parent=small_style, textColor=colors.HexColor('#92400e'))
+            )]],
+            colWidths=[519]
+        )
+        note_box.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fffbeb')),
+            ('BOX', (0, 0), (-1, -1), 0.6, colors.HexColor('#fbbf24')),
+            ('PADDING', (0, 0), (-1, -1), 8),
+        ]))
+        story.append(note_box)
     else:
         story.append(Paragraph("(특허 검색 결과 없음)", small_style))
 
