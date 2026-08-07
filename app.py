@@ -2031,14 +2031,16 @@ def main():
         start_time = time.time()
         api_key_to_pass = user_llm_key_input if 'user_llm_key_input' in locals() and user_llm_key_input else None
 
-        # --- AI Processing Visualization (완전 재설계) ---
-        # [전면 재설계] 기존 카드+배지 디자인을 버리고 "AI가 실제로 돌아가는 느낌"을
-        # 주는 궤도 회전 애니메이션(이중 반대방향 링 + 펄스 코어) + 그라디언트
-        # 텍스트로 교체함. 또한 기존엔 "Target: H1N1 | Extract: 종명 (부위)"를
-        # 배지 하나에 다 욱여넣어서 종/부위 이름이 길면 배지 밖으로 텍스트가
-        # 삐져나오는 버그가 있었음(스크린샷으로 확인됨) - 이번엔 Target/종/부위를
-        # 각각 독립된 pill로 분리하고 flex-wrap을 줘서 길어지면 자연스럽게
-        # 다음 줄로 넘어가도록 고침 (절대 잘리지 않음).
+        # --- AI Processing Visualization (2차 전면 재설계) ---
+        # [재설계 이유] 이전 버전에서도 "여전히 텍스트가 잘린다"는 피드백을 받음.
+        # 원인 재확인: 진행률 텍스트를 `st.progress(value, text=...)`의 네이티브
+        # text 파라미터로 넘기고 있었는데, 이건 Streamlit 자체 내장 위젯이라
+        # 커스텀 CSS가 전혀 먹히지 않고 Streamlit 기본 스타일(white-space:nowrap
+        # + ellipsis)이 그대로 적용되어 긴 문장이 계속 잘리고 있었음. 이번엔
+        # st.progress를 아예 쓰지 않고 진행바 자체를 순수 HTML/CSS로 직접 그려서
+        # 텍스트 잘림 가능성을 원천 차단함. 디자인은 첨부 참고 이미지(방사형
+        # 버스트 + 펄스 코어)에서 착안해 완전히 새로 그렸고, 연산 로그는 새 줄이
+        # 추가될 때마다 전체가 위로 밀려 올라가는 티커 방식으로 바꿈.
         progress_placeholder = st.empty()
         status_placeholder = st.empty()
         console_placeholder = st.empty()
@@ -2046,88 +2048,110 @@ def main():
         with status_placeholder.container():
             st.markdown("""
             <style>
-            @keyframes ai_spin {{ from {{ transform: rotate(0deg); }} to {{ transform: rotate(360deg); }} }}
-            @keyframes ai_spin_rev {{ from {{ transform: rotate(360deg); }} to {{ transform: rotate(0deg); }} }}
-            @keyframes ai_pulse_core {{
-                0%, 100% {{ box-shadow: 0 0 0 0 rgba(129,140,248,0.55), 0 0 18px 3px rgba(129,140,248,0.35); }}
-                50% {{ box-shadow: 0 0 0 10px rgba(129,140,248,0), 0 0 26px 7px rgba(129,140,248,0.55); }}
+            @keyframes ai2_radial_spin {{ to {{ transform: rotate(360deg); }} }}
+            @keyframes ai2_radial_spin_rev {{ to {{ transform: rotate(-360deg); }} }}
+            @keyframes ai2_pulse_core {{
+                0%, 100% {{ box-shadow: 0 0 0 0 rgba(129,140,248,0.55), 0 0 22px 5px rgba(129,140,248,0.4); }}
+                50% {{ box-shadow: 0 0 0 9px rgba(129,140,248,0), 0 0 32px 9px rgba(129,140,248,0.65); }}
             }}
-            @keyframes ai_fadein {{ from {{ opacity: 0; transform: translateY(6px); }} to {{ opacity: 1; transform: translateY(0); }} }}
-            @keyframes ai_gradient_shift {{
-                0% {{ background-position: 0% 50%; }}
-                50% {{ background-position: 100% 50%; }}
-                100% {{ background-position: 0% 50%; }}
+            @keyframes ai2_float1 {{ 0%,100% {{ transform: translate(0,0); }} 50% {{ transform: translate(3px,-4px); }} }}
+            @keyframes ai2_float2 {{ 0%,100% {{ transform: translate(0,0); }} 50% {{ transform: translate(-4px,3px); }} }}
+            @keyframes ai2_fadein {{ from {{ opacity: 0; transform: translateY(8px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+            @keyframes ai2_gradient_shift {{
+                0% {{ background-position: 0% 50%; }} 50% {{ background-position: 100% 50%; }} 100% {{ background-position: 0% 50%; }}
             }}
-            @keyframes ai_blink {{ 0%, 49% {{ opacity: 1; }} 50%, 100% {{ opacity: 0; }} }}
-            @keyframes ai_linein {{ from {{ opacity: 0; transform: translateX(-6px); }} to {{ opacity: 1; transform: translateX(0); }} }}
 
-            .ai_wrap {{
-                background: linear-gradient(135deg, #0b1120 0%, #151b33 50%, #1a1035 100%);
-                background-size: 200% 200%;
-                animation: ai_gradient_shift 6s ease infinite, ai_fadein 0.4s ease;
-                border-radius: 16px 16px 0 0; border: 1px solid #2d3557; border-bottom: none;
-                padding: 22px 24px 18px 24px; position: relative; overflow: hidden;
+            .ai2_wrap {{
+                background: radial-gradient(ellipse at 50% -10%, #1e1b4b 0%, #0b1120 55%, #0b1120 100%);
+                border-radius: 18px 18px 0 0; border: 1px solid #2d3557; border-bottom: none;
+                padding: 28px 24px 20px 24px; text-align: center; position: relative;
+                overflow: hidden; animation: ai2_fadein 0.4s ease;
             }}
-            .ai_top_row {{ display: flex; align-items: center; gap: 16px; }}
-            .ai_orbit {{ position: relative; width: 52px; height: 52px; flex-shrink: 0; }}
-            .ai_orbit_ring {{ position: absolute; border-radius: 50%; border: 2.5px solid transparent; }}
-            .ai_orbit_ring.r1 {{ inset: 0; border-top-color: #818cf8; border-right-color: rgba(129,140,248,0.15); animation: ai_spin 2s linear infinite; }}
-            .ai_orbit_ring.r2 {{ inset: 9px; border-bottom-color: #38bdf8; border-left-color: rgba(56,189,248,0.15); animation: ai_spin_rev 1.4s linear infinite; }}
-            .ai_orbit_core {{
-                position: absolute; inset: 17px; border-radius: 50%;
-                background: radial-gradient(circle at 35% 30%, #c7d2fe, #6366f1 75%);
-                animation: ai_pulse_core 1.8s ease-in-out infinite;
-                display: flex; align-items: center; justify-content: center; font-size: 15px;
+            .ai2_radial {{
+                width: 108px; height: 108px; border-radius: 50%; position: relative; margin: 0 auto 14px auto;
+                background: repeating-conic-gradient(from 0deg, rgba(99,102,241,0.55) 0deg 1.6deg, transparent 1.6deg 9deg);
+                animation: ai2_radial_spin 7s linear infinite;
+                -webkit-mask-image: radial-gradient(circle, transparent 34%, black 38%, black 92%, transparent 100%);
+                        mask-image: radial-gradient(circle, transparent 34%, black 38%, black 92%, transparent 100%);
             }}
-            .ai_title_block {{ flex: 1; min-width: 0; }}
-            .ai_title {{
-                font-size: 19px; font-weight: 800;
-                background: linear-gradient(90deg, #a5b4fc, #67e8f9, #a5b4fc);
+            .ai2_radial_ring2 {{
+                position: absolute; inset: 10px; border-radius: 50%;
+                background: repeating-conic-gradient(from 45deg, rgba(56,189,248,0.4) 0deg 1deg, transparent 1deg 7deg);
+                animation: ai2_radial_spin_rev 5s linear infinite;
+                -webkit-mask-image: radial-gradient(circle, transparent 40%, black 44%, black 88%, transparent 100%);
+                        mask-image: radial-gradient(circle, transparent 40%, black 44%, black 88%, transparent 100%);
+            }}
+            .ai2_core {{
+                position: absolute; inset: 34px; border-radius: 50%;
+                background: radial-gradient(circle at 35% 30%, #e0e7ff, #6366f1 75%);
+                animation: ai2_pulse_core 1.8s ease-in-out infinite;
+                display: flex; align-items: center; justify-content: center; font-size: 20px;
+            }}
+            .ai2_glow1, .ai2_glow2 {{ position: absolute; border-radius: 50%; filter: blur(11px); opacity: 0.55; pointer-events: none; }}
+            .ai2_glow1 {{ width: 30px; height: 30px; background: #f472b6; top: 4px; left: 10px; animation: ai2_float1 4.2s ease-in-out infinite; }}
+            .ai2_glow2 {{ width: 24px; height: 24px; background: #38bdf8; bottom: 6px; right: 12px; animation: ai2_float2 5.1s ease-in-out infinite; }}
+            .ai2_title {{
+                font-size: 20px; font-weight: 800;
+                background: linear-gradient(90deg, #c7d2fe, #67e8f9, #c7d2fe);
                 background-size: 200% auto; -webkit-background-clip: text; background-clip: text;
-                -webkit-text-fill-color: transparent; color: #a5b4fc;
-                animation: ai_gradient_shift 3s linear infinite;
+                -webkit-text-fill-color: transparent; color: #c7d2fe;
+                animation: ai2_gradient_shift 3s linear infinite;
+                margin-bottom: 4px;
             }}
-            .ai_subtitle {{ font-size: 12px; color: #94a3b8; margin-top: 3px; }}
-            .ai_meta_row {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }}
-            .ai_meta_pill {{
+            .ai2_subtitle {{ font-size: 12px; color: #94a3b8; margin-bottom: 14px; }}
+            .ai2_meta_row {{ display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }}
+            .ai2_meta_pill {{
                 background: rgba(129,140,248,0.14); border: 1px solid rgba(129,140,248,0.35);
                 color: #c7d2fe; font-size: 11.5px; font-weight: 700; padding: 5px 12px;
-                border-radius: 20px; white-space: nowrap; max-width: 100%;
+                border-radius: 20px; white-space: nowrap;
             }}
-            .ai_console {{
+
+            .ai2_progress_wrap {{
+                background: #0b1120; border: 1px solid #2d3557; border-top: none;
+                padding: 14px 24px 16px 24px;
+            }}
+            .ai2_progress_label {{
+                font-size: 12.5px; color: #cbd5e1; margin-bottom: 8px; line-height: 1.6;
+                white-space: normal; word-break: keep-all; min-height: 20px;
+            }}
+            .ai2_progress_track {{ height: 9px; background: #1e293b; border-radius: 6px; overflow: hidden; }}
+            .ai2_progress_fill {{
+                height: 100%; border-radius: 6px; transition: width 0.4s ease;
+                background: linear-gradient(90deg, #6366f1, #38bdf8);
+                box-shadow: 0 0 10px 1px rgba(56,189,248,0.55);
+            }}
+
+            .ai2_console {{
                 background: #03050c; border: 1px solid #2d3557; border-top: none;
-                border-radius: 0 0 16px 16px; padding: 16px 22px;
+                border-radius: 0 0 18px 18px; padding: 14px 22px;
                 font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace;
-                font-size: 12.5px; line-height: 1.9; color: #a5f3fc;
-                min-height: 168px; max-height: 168px; overflow: hidden;
+                font-size: 12.5px; color: #a5f3fc;
+                height: 172px; overflow: hidden; position: relative;
             }}
-            .ai_console_line {{ animation: ai_linein 0.25s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
-            .ai_console_line.ai_done {{ color: #475569; }}
-            .ai_console_line.ai_current {{ color: #67e8f9; font-weight: 700; }}
-            .ai_cursor {{ display: inline-block; color: #67e8f9; animation: ai_blink 1s step-start infinite; }}
+            .ai2_console_inner {{ transition: transform 0.35s cubic-bezier(.4,0,.2,1); }}
+            .ai2_console_line {{ height: 26px; line-height: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+            .ai2_console_line.ai2_done {{ color: #475569; }}
+            .ai2_console_line.ai2_current {{ color: #67e8f9; font-weight: 700; }}
+            .ai2_cursor {{ display: inline-block; color: #67e8f9; animation: ai2_blink 1s step-start infinite; }}
+            @keyframes ai2_blink {{ 0%, 49% {{ opacity: 1; }} 50%, 100% {{ opacity: 0; }} }}
             </style>
-            <div class="ai_wrap">
-                <div class="ai_top_row">
-                    <div class="ai_orbit">
-                        <div class="ai_orbit_ring r1"></div>
-                        <div class="ai_orbit_ring r2"></div>
-                        <div class="ai_orbit_core">🧠</div>
-                    </div>
-                    <div class="ai_title_block">
-                        <div class="ai_title">LitPhyto AI Pipeline Running</div>
-                        <div class="ai_subtitle">5-Stage Deep Antiviral &amp; Phytochemical Intelligence Analysis</div>
-                    </div>
+            <div class="ai2_wrap">
+                <div class="ai2_radial">
+                    <div class="ai2_radial_ring2"></div>
+                    <div class="ai2_core">🧠</div>
+                    <div class="ai2_glow1"></div>
+                    <div class="ai2_glow2"></div>
                 </div>
-                <div class="ai_meta_row">
-                    <span class="ai_meta_pill">🧬 {query_input}</span>
-                    <span class="ai_meta_pill">🎯 Target: {target_virus}</span>
-                    <span class="ai_meta_pill">🌿 Part: {extract_part}</span>
+                <div class="ai2_title">LitPhyto AI Pipeline Running</div>
+                <div class="ai2_subtitle">5-Stage Deep Antiviral &amp; Phytochemical Intelligence Analysis</div>
+                <div class="ai2_meta_row">
+                    <span class="ai2_meta_pill">🧬 {query_input}</span>
+                    <span class="ai2_meta_pill">🎯 Target: {target_virus}</span>
+                    <span class="ai2_meta_pill">🌿 Part: {extract_part}</span>
                 </div>
             </div>
             """.format(target_virus=target_virus, query_input=query_input, extract_part=extract_part), unsafe_allow_html=True)
 
-        # [수정] 5단계 연산 로그 - 마지막 "결과 검토 및 QC 검증" 단계가 새로 추가된 부분.
-        # 각 줄이 실제로 하나씩 콘솔에 출력되면서 진행률 바도 같이 움직임.
         STAGE_LOG = [
             ("[Stage 1/5] 문헌 및 화합물 마이닝", [
                 f"PubChem/문헌 DB에서 {query_input} 후보 화합물 조회 중...",
@@ -2158,6 +2182,8 @@ def main():
         total_steps = sum(len(lines) for _, lines in STAGE_LOG)
 
         console_lines = []
+        VISIBLE_ROWS = 6
+        ROW_HEIGHT = 26
 
         def _render_console(current_text=None):
             rows = list(console_lines)
@@ -2165,15 +2191,30 @@ def main():
                 rows = rows + [current_text]
             html_rows = []
             for i, r in enumerate(rows):
-                cls = "ai_current" if (current_text and i == len(rows) - 1) else "ai_done"
-                cursor = ' <span class="ai_cursor">▌</span>' if (current_text and i == len(rows) - 1) else ""
-                html_rows.append(f'<div class="ai_console_line {cls}">{r}{cursor}</div>')
+                cls = "ai2_current" if (current_text and i == len(rows) - 1) else "ai2_done"
+                cursor = ' <span class="ai2_cursor">▌</span>' if (current_text and i == len(rows) - 1) else ""
+                html_rows.append(f'<div class="ai2_console_line {cls}">{r}{cursor}</div>')
+            # [수정] 잘라서 마지막 9줄만 보여주던 방식 -> 전체 줄을 다 렌더링해두고
+            # transform:translateY로 위로 밀어올리는 방식으로 바꿈. 새 줄이 추가될
+            # 때마다 전체 로그가 부드럽게 한 줄씩 위로 스크롤되는 티커 효과가 남.
+            offset = max(0, len(rows) - VISIBLE_ROWS) * ROW_HEIGHT
             console_placeholder.markdown(
-                f'<div class="ai_console">{"".join(html_rows[-9:])}</div>',
+                f'<div class="ai2_console"><div class="ai2_console_inner" style="transform:translateY(-{offset}px);">{"".join(html_rows)}</div></div>',
                 unsafe_allow_html=True
             )
 
-        bar = progress_placeholder.progress(0, text=STAGE_LOG[0][0])
+        def _render_progress(pct, label):
+            # [수정] st.progress(text=...) 네이티브 위젯 대신 순수 HTML 진행바로
+            # 교체함 - Streamlit 자체 CSS(white-space:nowrap+ellipsis)가 텍스트를
+            # 계속 잘라내던 근본 원인을 제거하고, 완전히 자유롭게 줄바꿈되도록 함.
+            progress_placeholder.markdown(f"""
+            <div class="ai2_progress_wrap">
+                <div class="ai2_progress_label">{label}</div>
+                <div class="ai2_progress_track"><div class="ai2_progress_fill" style="width:{pct}%;"></div></div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        _render_progress(0, STAGE_LOG[0][0])
         step_i = 0
         for stage_title, lines in STAGE_LOG:
             for line in lines:
@@ -2182,7 +2223,7 @@ def main():
                 time.sleep(0.35)
                 console_lines.append(f"✓ {line}")
                 pct = int(step_i / total_steps * 94)
-                bar.progress(pct, text=f"{stage_title} · {line}")
+                _render_progress(pct, f"{stage_title} · {line}")
                 _render_console()
                 time.sleep(0.25)
 
@@ -2205,7 +2246,7 @@ def main():
             console_lines.append("✓ 파이프라인 결과 최종 조합 중...")
             console_lines.append("✅ 전체 파이프라인 완료 - 검토 통과.")
             _render_console()
-            bar.progress(100, text="✅ Analysis Complete!")
+            _render_progress(100, "✅ Analysis Complete!")
             time.sleep(1.0)
         except Exception as e:
             st.error(f"파이프라인 실행 오류: {e}")
@@ -2215,6 +2256,7 @@ def main():
             console_placeholder.empty()
 
         st.session_state["elapsed_time"] = round(time.time() - start_time, 2)
+
 
     result = st.session_state.get("pipeline_result", None)
 
@@ -2597,7 +2639,15 @@ def main():
         # 빠져나와 있었음(스크린샷에서 확인된 그대로). st.container(border=True)로
         # 전체를 진짜 하나의 박스에 담고, 다른 영역(초록)과 구분되도록 인디고/
         # 보라 계열 강조색으로 바꿈.
-        with st.container(border=True):
+        # [수정] key="ai_engine_panel"을 주면 Streamlit이 자동으로 이 컨테이너에
+        # "st-key-ai_engine_panel" CSS 클래스를 부여함 - 이를 이용해 테두리를
+        # 더 진하고 두껍게 만들어서 다른 영역과의 구분을 명확히 함.
+        st.markdown("""
+        <style>
+        .st-key-ai_engine_panel { border: 2.5px solid #6366f1 !important; box-shadow: 0 4px 18px rgba(99,102,241,0.18) !important; }
+        </style>
+        """, unsafe_allow_html=True)
+        with st.container(border=True, key="ai_engine_panel"):
             st.markdown("""
             <div style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%); margin:-1px -1px 18px -1px; padding:16px 22px; border-radius:9px 9px 0 0;">
                 <div style="font-size:16px; font-weight:800; color:#ffffff; display:flex; align-items:center; gap:8px;">
@@ -2607,6 +2657,7 @@ def main():
             """, unsafe_allow_html=True)
 
             engine_col, version_col = st.columns([1.2, 1.8])
+
 
             with engine_col:
                 st.markdown("<div style='font-size:13px; font-weight:700; color:#4338ca; margin-bottom:6px;'>1. 연산 AI 엔진 선택:</div>", unsafe_allow_html=True)
@@ -2767,11 +2818,10 @@ def main():
 </div>
 </div>"""
 
-            # [수정] 카드와 다운로드 버튼을 진짜 하나의 박스 안에 배치하기 위해
-            # st.container(border=True)로 감쌈. 기존엔 카드(HTML)와 다운로드
-            # 버튼(Streamlit 위젯)이 서로 다른 블록이라 시각적으로 분리돼
-            # 보였음 - 이제 옵션 하나가 실제로 하나의 테두리 안에 들어감.
-            with st.container(border=True):
+            # [수정] 옵션 카드도 Lead Candidates/Patent Search 탭처럼 기본 닫힌
+            # expander로 감쌈 (사용자 요청). expander 자체가 테두리를 제공하므로
+            # 기존의 별도 st.container(border=True)는 걷어내고 expander로 대체함.
+            with st.expander(f"Option #{prop['rank']}: {prop['name'].split('(')[0].strip()} | {prop['yield_boost']}", expanded=False):
                 card_html = f"""<div style="background:linear-gradient(180deg,{pal['light']} 0%,#ffffff 60px); border-radius:8px 8px 0 0; margin:-1px -1px 0 -1px; padding:4px 4px 20px 4px;">
 <div style="height:6px; background:{pal['solid']}; border-radius:6px; margin-bottom:18px;"></div>
 <div style="padding:0 16px;">
@@ -2810,9 +2860,9 @@ def main():
 🔗 검증 학술 논문, 구글 학술검색 및 관련 특허 원문 검색:
 </div>
 <div style="display:flex; gap:12px; flex-wrap:wrap;">
-<a href="{paper_url}" target="_blank" style="background:#059669; color:#ffffff; font-weight:700; font-size:13.5px; padding:9px 18px; border-radius:8px; text-decoration:none; display:inline-block; box-shadow:0 2px 6px rgba(5,150,105,0.25);">📄 Direct PubMed Search ({paper_label}) ↗</a>
-<a href="{scholar_url}" target="_blank" style="background:#2563eb; color:#ffffff; font-weight:700; font-size:13.5px; padding:9px 18px; border-radius:8px; text-decoration:none; display:inline-block; box-shadow:0 2px 6px rgba(37,99,235,0.25);">🎓 Google Scholar Academic Search ↗</a>
-<a href="{patent_url}" target="_blank" style="background:#0284c7; color:#ffffff; font-weight:700; font-size:13.5px; padding:9px 18px; border-radius:8px; text-decoration:none; display:inline-block; box-shadow:0 2px 6px rgba(2,132,199,0.25);">📜 Direct Patent Claims Search ({patent_label}) ↗</a>
+<a href="{paper_url}" target="_blank" style="background:#ffffff; border:1.5px solid #cbd5e1; color:#334155; font-weight:700; font-size:13.5px; padding:8px 17px; border-radius:8px; text-decoration:none; display:inline-block;">📄 Direct PubMed Search ({paper_label}) ↗</a>
+<a href="{scholar_url}" target="_blank" style="background:#ffffff; border:1.5px solid #cbd5e1; color:#334155; font-weight:700; font-size:13.5px; padding:8px 17px; border-radius:8px; text-decoration:none; display:inline-block;">🎓 Google Scholar Academic Search ↗</a>
+<a href="{patent_url}" target="_blank" style="background:#ffffff; border:1.5px solid #cbd5e1; color:#334155; font-weight:700; font-size:13.5px; padding:8px 17px; border-radius:8px; text-decoration:none; display:inline-block;">📜 Direct Patent Claims Search ({patent_label}) ↗</a>
 </div>
 </div>
 </div>
@@ -2841,6 +2891,23 @@ def main():
                     # [수정] 아이콘을 텍스트 속 이모지가 아니라 옵션 색상 그라디언트
                     # 배지로 만들고, 제목/부제 위계를 나눠서 좀 더 정돈된 다운로드
                     # 카드 형태로 바꿈.
+                    # [수정] 다운로드 버튼 자체 색상도 옵션 색으로 맞춤. Streamlit은
+                    # 위젯의 key 파라미터를 "st-key-{key}" CSS 클래스로 자동 반영하는데,
+                    # 이를 이용해 네이티브 버튼 위젯도 옵션별로 다른 색을 입힘.
+                    st.markdown(f"""
+                    <style>
+                    .st-key-dl_single_pdf_{prop.get('rank', 1)} div[data-testid="stDownloadButton"] button {{
+                        background-color: {pal['solid']} !important;
+                        border-color: {pal['solid']} !important;
+                        color: #ffffff !important;
+                    }}
+                    .st-key-dl_single_pdf_{prop.get('rank', 1)} div[data-testid="stDownloadButton"] button:hover {{
+                        background-color: {pal['text']} !important;
+                        border-color: {pal['text']} !important;
+                        color: #ffffff !important;
+                    }}
+                    </style>
+                    """, unsafe_allow_html=True)
                     dl_icon_col, dl_text_col, dl_btn_col = st.columns([0.5, 3.3, 1.7])
                     with dl_icon_col:
                         st.markdown(f"""<div style="width:42px; height:42px; border-radius:12px; background:linear-gradient(135deg, {pal['solid']} 0%, {pal['text']} 100%); display:flex; align-items:center; justify-content:center; font-size:19px; box-shadow:0 3px 10px rgba(0,0,0,0.18); margin-top:2px;">📄</div>""", unsafe_allow_html=True)
