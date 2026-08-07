@@ -3560,6 +3560,12 @@ def main():
                     lead.get('ratio_estimate', 0.2), result.get('target_virus', 'H1N1')
                 )
                 max_ratio = max(tissue_ratios.values()) if tissue_ratios else 1.0
+                # [수정] 부위별 함유 비율 바 색상을 Rank 카드의 색상(빨강/파랑/
+                # 초록/주황/보라)과 일치시킴. 기존엔 항상 초록 고정이었음.
+                # "색이 조금 흐리면서 그라데이션으로" 요청에 따라 원색을 그대로
+                # 쓰지 않고 알파(투명도)를 섞어 부드러운 톤으로 만듦.
+                bar_grad_start = f"{_bd}cc"  # 약 80% 불투명
+                bar_grad_end = f"{_bd}66"    # 약 40% 불투명 (더 옅음)
                 bars_html = "<div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px;'>"
                 bars_html += "<div style='font-size:12px; font-weight:800; color:#334155; margin-bottom:10px;'>부위별 예상 함유 비율 (Tissue-wise Estimated Content Ratio)</div>"
                 for part_label, ratio in tissue_ratios.items():
@@ -3568,9 +3574,9 @@ def main():
                     bars_html += f"""<div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
 <div style="width:130px; font-size:11.5px; color:#475569; font-weight:600;">{part_label}</div>
 <div style="flex:1; background:#e2e8f0; border-radius:6px; height:14px; overflow:hidden;">
-<div style="width:{bar_width}%; background:linear-gradient(90deg,#059669,#34d399); height:100%; border-radius:6px;"></div>
+<div style="width:{bar_width}%; background:linear-gradient(90deg,{bar_grad_start},{bar_grad_end}); height:100%; border-radius:6px;"></div>
 </div>
-<div style="width:48px; font-size:11.5px; font-weight:700; color:#059669; text-align:right;">{pct}%</div>
+<div style="width:48px; font-size:11.5px; font-weight:700; color:{_tx}; text-align:right;">{pct}%</div>
 </div>"""
                 bars_html += "</div>"
                 st.markdown(bars_html, unsafe_allow_html=True)
