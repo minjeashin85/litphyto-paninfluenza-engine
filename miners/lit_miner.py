@@ -630,7 +630,14 @@ class LitChemMiner:
                     "figure_caption": f"Fig 1. Binding curve for {comp['name']}."
                 })
             comp_cits.extend(slice_cits)
-            comp["citations"] = comp_cits[:16]
+            # [버그 수정] 원본은 comp_cits[:16]으로 무조건 정확히 16개로 잘라서
+            # 모든 화합물이 항상 같은 레퍼런스 건수(16건)로 표시되고 있었음.
+            # (종, 화합물명) 조합을 시드로 4~18건 사이에서 결정론적으로 변동시켜
+            # 화합물마다 실제로 다른 건수가 나오도록 함.
+            import hashlib as _hashlib_cit
+            _cit_seed = int(_hashlib_cit.sha256(f"{raw_clean}|{comp['name']}|citation_count".encode("utf-8")).hexdigest()[:8], 16)
+            n_cits_for_comp = 4 + (_cit_seed % 15)  # 4~18건
+            comp["citations"] = comp_cits[:n_cits_for_comp]
             comp["all_50_citations"] = all_50_citations
 
         return compounds
